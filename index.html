@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zig Studio v0.2 — The Official Bespoke IDE for the Zig Programming Language</title>
+    <title>Zig Studio v0.3 — The Official Bespoke IDE for the Zig Programming Language</title>
     <!-- Tailwind CSS for high fidelity layout -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
@@ -141,7 +141,7 @@
                 <div>
                     <div class="flex items-center space-x-1.5">
                         <span class="font-extrabold text-white tracking-wider text-base">ZIG STUDIO</span>
-                        <span class="text-[#f7a41d] font-semibold text-[10px] px-1.5 py-0.5 bg-[#f7a41d]/10 rounded border border-[#f7a41d]/20 code-font">v0.2</span>
+                        <span class="text-[#f7a41d] font-semibold text-[10px] px-1.5 py-0.5 bg-[#f7a41d]/10 rounded border border-[#f7a41d]/20 code-font">v0.3</span>
                     </div>
                     <div class="text-[10px] text-slate-400 font-mono">Bespoke Environment for Andrew Kelley & ZSF</div>
                 </div>
@@ -160,7 +160,7 @@
                 </button>
             </div>
 
-            <!-- Panel Toggle Buttons (Quick Collapse/Expand) -->
+            <!-- Panel Toggle Buttons (Quick Collapse/Expand + Split & Zen) -->
             <div class="hidden xl:flex items-center space-x-1 bg-[#090b0f] p-0.5 rounded border border-[#242936]">
                 <button onclick="toggleLeftSidebar()" id="toggle-btn-left" title="Toggle Left Sidebar (Ctrl+B)" class="px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
                     ◧ Side
@@ -170,6 +170,16 @@
                 </button>
                 <button onclick="toggleRightSidebar()" id="toggle-btn-right" title="Toggle Right Inspector" class="px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
                     ◨ Tools
+                </button>
+                <span class="w-[1px] h-4 bg-[#242936]"></span>
+                <button onclick="toggleSplitEditor()" id="toggle-btn-split-hdr" title="Toggle Split Editor (Ctrl+\)" class="px-2 py-1 text-[#4ea8de] hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ◫ Split
+                </button>
+                <button onclick="openCommandPalette('command')" id="toggle-btn-pal-hdr" title="Command Palette (Ctrl+Shift+P)" class="px-2 py-1 text-[#f7a41d] hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ⌘ Pal
+                </button>
+                <button onclick="toggleZenMode()" id="toggle-btn-zen-hdr" title="Distraction-Free Zen Mode (Alt+Z)" class="px-2 py-1 text-emerald-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    🧘 Zen
                 </button>
             </div>
         </div>
@@ -303,14 +313,68 @@
         <!-- CENTER MAIN WORKSPACE (EDITOR / STD.BUILD DAG / COMPILER EXPLORER) -->
         <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0f1115]" id="center-main">
             
-            <!-- VIEW 1: MONACO CODE EDITOR -->
+            <!-- VIEW 1: MONACO CODE EDITOR (MULTI-PANE SPLIT + STICKY BREADCRUMBS) -->
             <div class="flex-1 flex flex-col min-h-0 relative" id="main-view-editor">
-                <!-- File Tabs Bar -->
-                <div class="bg-[#12151c] flex items-center border-b border-[#242936] overflow-x-auto text-xs" id="editor-tabs-container"></div>
+                <!-- Top Tabs Bar + Action Bar -->
+                <div class="bg-[#12151c] flex items-center justify-between border-b border-[#242936] text-xs">
+                    <div class="flex items-center overflow-x-auto flex-1" id="editor-tabs-container"></div>
+                    <div class="flex items-center space-x-1 px-2 py-1 flex-shrink-0 bg-[#12151c]">
+                        <button onclick="toggleSplitEditor()" id="btn-split-editor" title="Toggle Split Editor Panes (Ctrl+\)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-[#181d28] hover:bg-[#22293a] text-[#4ea8de] border border-[#2d3446] transition flex items-center space-x-1">
+                            <span>◫</span>
+                            <span class="hidden md:inline">Split</span>
+                        </button>
+                        <button onclick="openCommandPalette('file')" title="Quick Open File (Ctrl+P)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-[#181d28] hover:bg-[#22293a] text-slate-300 border border-[#2d3446] transition flex items-center space-x-1">
+                            <span>🔍</span>
+                            <span class="hidden md:inline">Find</span>
+                        </button>
+                        <button onclick="toggleZenMode()" id="btn-zen-toggle" title="Distraction-Free Zen Mode (Alt+Z)" class="px-2 py-0.5 text-[11px] font-mono rounded bg-[#181d28] hover:bg-[#22293a] text-emerald-400 border border-[#2d3446] transition flex items-center space-x-1">
+                            <span>🧘</span>
+                            <span class="hidden md:inline">Zen</span>
+                        </button>
+                    </div>
+                </div>
 
-                <!-- Monaco Editor Container -->
-                <div class="flex-1 relative w-full h-full min-h-0">
-                    <div id="monaco-root"></div>
+                <!-- Sticky Breadcrumbs Bar -->
+                <div id="editor-breadcrumbs-bar" class="bg-[#0c0e14] border-b border-[#1f2430] px-3 py-1 flex items-center text-[11px] font-mono text-slate-400 space-x-1.5 overflow-x-auto shadow-inner">
+                    <span class="text-slate-500">📁</span>
+                    <span>src</span>
+                    <span class="text-slate-600">›</span>
+                    <span class="text-[#f7a41d] flex items-center space-x-1">
+                        <span>📄</span>
+                        <span id="breadcrumb-filename">main.zig</span>
+                    </span>
+                    <span class="text-slate-600">›</span>
+                    <span id="breadcrumb-scope" class="text-cyan-400 flex items-center space-x-1 cursor-pointer hover:underline" onclick="openCommandPalette('command')">
+                        <span>⚡</span>
+                        <span id="breadcrumb-symbol">main</span>
+                    </span>
+                    <span class="text-slate-600 text-[10px] ml-auto hidden sm:inline text-slate-500 font-mono">
+                        <span id="active-pane-indicator" class="text-slate-400">Pane: Primary</span>
+                    </span>
+                </div>
+
+                <!-- Monaco Multi-Pane Split Workspace -->
+                <div class="flex-1 flex min-h-0 relative w-full h-full" id="editors-split-wrapper">
+                    <!-- Primary Pane (Left) -->
+                    <div class="flex-1 relative h-full min-w-0 flex flex-col" id="pane-primary">
+                        <div id="monaco-root" class="flex-1 w-full h-full"></div>
+                    </div>
+
+                    <!-- Editor Split Resizer Divider -->
+                    <div id="resizer-editor-split" class="resizer-h hidden" title="Drag to resize split panes"></div>
+
+                    <!-- Secondary Pane (Right) -->
+                    <div class="flex-1 relative h-full min-w-0 flex flex-col hidden bg-[#0a0c10]" id="pane-secondary">
+                        <!-- Secondary Pane Tabs Header -->
+                        <div class="bg-[#10131a] flex items-center border-b border-[#242936] text-xs px-2 py-1 justify-between">
+                            <div class="flex items-center space-x-1 overflow-x-auto" id="secondary-tabs-container"></div>
+                            <div class="flex items-center space-x-1 flex-shrink-0">
+                                <span class="text-[10px] text-slate-500 font-mono mr-1">Pane 2</span>
+                                <button onclick="toggleSplitEditor()" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded hover:bg-[#1a1f2c]" title="Close Split Pane">✕</button>
+                            </div>
+                        </div>
+                        <div id="monaco-secondary-root" class="flex-1 w-full h-full"></div>
+                    </div>
                 </div>
             </div>
 
@@ -431,20 +495,51 @@
                     </div>
                 </div>
 
-                <!-- 32-Cell Interactive Heap Grid -->
-                <div class="grid grid-cols-8 gap-1.5 p-2 bg-[#090b0f] rounded-lg border border-[#242936] mb-2" id="heap-grid-container"></div>
+                <!-- View Mode Sub-tabs: 32-Cell Grid vs Raw Hex Dump -->
+                <div class="flex items-center space-x-1 mb-2 bg-[#090b0f] p-0.5 rounded border border-[#242936]">
+                    <button onclick="setHeapViewMode('grid')" id="btn-heap-mode-grid" class="flex-1 py-1 text-[10px] font-mono rounded bg-[#1e2433] text-white transition">
+                        Grid (32-Cell)
+                    </button>
+                    <button onclick="setHeapViewMode('hex')" id="btn-heap-mode-hex" class="flex-1 py-1 text-[10px] font-mono rounded text-slate-400 hover:text-slate-200 transition">
+                        Raw Hex Dump (16B)
+                    </button>
+                </div>
 
-                <!-- Legend -->
-                <div class="flex items-center justify-between text-[10px] text-slate-400 px-1 font-mono mb-2.5" id="heap-legend-container"></div>
+                <!-- SUB-VIEW A: 32-Cell Grid View -->
+                <div id="heap-view-grid-wrapper">
+                    <!-- 32-Cell Interactive Heap Grid -->
+                    <div class="grid grid-cols-8 gap-1.5 p-2 bg-[#090b0f] rounded-lg border border-[#242936] mb-2" id="heap-grid-container"></div>
 
-                <!-- Dynamic Allocation Timeline Canvas -->
-                <div class="mb-2">
-                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mb-1">
-                        <span>Heap Allocation Timeline</span>
-                        <span id="memory-canary-badge" class="text-emerald-400 font-semibold">✔ Canaries Intact</span>
+                    <!-- Legend -->
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 px-1 font-mono mb-2.5" id="heap-legend-container"></div>
+
+                    <!-- Dynamic Allocation Timeline Canvas -->
+                    <div class="mb-2">
+                        <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mb-1">
+                            <span>Heap Allocation Timeline</span>
+                            <span id="memory-canary-badge" class="text-emerald-400 font-semibold">✔ Canaries Intact</span>
+                        </div>
+                        <div class="bg-[#090b0f] p-1 rounded border border-[#242936]">
+                            <canvas id="profiler-canvas" width="280" height="42" class="w-full h-10 block"></canvas>
+                        </div>
                     </div>
-                    <div class="bg-[#090b0f] p-1 rounded border border-[#242936]">
-                        <canvas id="profiler-canvas" width="280" height="42" class="w-full h-10 block"></canvas>
+                </div>
+
+                <!-- SUB-VIEW B: Raw Hex Memory Dump View -->
+                <div id="heap-view-hex-wrapper" class="hidden mb-2">
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1 px-1">
+                        <span>Offset (64-bit)</span>
+                        <span>Hex (16B) · ASCII</span>
+                    </div>
+                    <div class="bg-[#090b0f] rounded-lg border border-[#242936] p-2 max-h-52 overflow-y-auto font-mono text-[10px] leading-tight select-text" id="heap-hex-dump-container">
+                        <!-- Dynamically populated -->
+                    </div>
+                    <div class="flex items-center justify-between text-[9px] text-slate-500 font-mono mt-1 px-1">
+                        <span class="text-[#f7a41d]">■ Meta</span>
+                        <span class="text-[#4ea8de]">■ User</span>
+                        <span class="text-pink-400">■ Canary</span>
+                        <span class="text-red-400">■ Corrupt</span>
+                        <span class="text-slate-600">■ Free</span>
                     </div>
                 </div>
 
@@ -607,6 +702,23 @@
         let activeZlsMode = 'mock'; // 'mock' | 'ws'
         let zlsWebSocket = null;
         let zlsLogs = [];
+
+        // v0.3 Split Editor & Multi-Pane State
+        let editorInstanceSecondary = null;
+        let isEditorSplit = false;
+        let activeSecondaryFileKey = "src/build.zig";
+        let activeFocusedPane = 'primary'; // 'primary' | 'secondary'
+
+        // v0.3 Raw Hex Dump View State
+        let heapViewMode = 'grid'; // 'grid' | 'hex'
+
+        // v0.3 Command Palette State
+        let paletteMode = 'file'; // 'file' | 'command'
+        let paletteSelectedIndex = 0;
+        let filteredPaletteItems = [];
+
+        // v0.3 Zen Mode State
+        let isZenMode = false;
 
         // Target Triples Matrix
         const targetTriplesConfig = {
@@ -906,6 +1018,13 @@ pub fn build(b: *std.Build) void {
             editorInstance.onDidChangeCursorPosition(e => {
                 document.getElementById('footer-cursor-line').innerText = e.position.lineNumber;
                 document.getElementById('footer-cursor-col').innerText = e.position.column;
+                updateBreadcrumbs(editorInstance, activeFileKey);
+            });
+
+            editorInstance.onDidFocusEditorWidget(() => {
+                activeFocusedPane = 'primary';
+                updateActivePaneIndicator();
+                updateBreadcrumbs(editorInstance, activeFileKey);
             });
 
             editorInstance.onDidChangeModelContent(() => {
@@ -925,6 +1044,9 @@ pub fn build(b: *std.Build) void {
             initTerminalLogs();
             updateTargetTelemetry();
             updateFooterStats();
+            updateBreadcrumbs(editorInstance, activeFileKey);
+            updateActivePaneIndicator();
+            setupPaletteInput();
 
             // Setup Resizable Splitters
             setupPanelResizers();
@@ -1045,6 +1167,21 @@ pub fn build(b: *std.Build) void {
                 e.preventDefault();
             });
 
+            // 4. Resizer Editor Split (Horizontal Drag between Panes)
+            const resizerSplit = document.getElementById('resizer-editor-split');
+            const panePrimary = document.getElementById('pane-primary');
+            const splitWrapper = document.getElementById('editors-split-wrapper');
+            let isDraggingSplit = false;
+
+            if (resizerSplit) {
+                resizerSplit.addEventListener('mousedown', (e) => {
+                    isDraggingSplit = true;
+                    resizerSplit.classList.add('resizing');
+                    body.style.cursor = 'col-resize';
+                    e.preventDefault();
+                });
+            }
+
             // Global Mousemove & Mouseup
             window.addEventListener('mousemove', (e) => {
                 if (isDraggingLeft) {
@@ -1068,17 +1205,25 @@ pub fn build(b: *std.Build) void {
                     isTerminalCollapsed = false;
                     isTerminalMaximized = false;
                     layoutEditor();
+                } else if (isDraggingSplit && splitWrapper && panePrimary) {
+                    const rect = splitWrapper.getBoundingClientRect();
+                    const newWidth = Math.min(Math.max(160, e.clientX - rect.left), rect.width - 160);
+                    panePrimary.style.flex = 'none';
+                    panePrimary.style.width = `${newWidth}px`;
+                    layoutEditor();
                 }
             });
 
             window.addEventListener('mouseup', () => {
-                if (isDraggingLeft || isDraggingRight || isDraggingBottom) {
+                if (isDraggingLeft || isDraggingRight || isDraggingBottom || isDraggingSplit) {
                     isDraggingLeft = false;
                     isDraggingRight = false;
                     isDraggingBottom = false;
+                    isDraggingSplit = false;
                     resizerLeft.classList.remove('resizing');
                     resizerRight.classList.remove('resizing');
                     resizerBottom.classList.remove('resizing');
+                    if (resizerSplit) resizerSplit.classList.remove('resizing');
                     body.style.cursor = '';
                     layoutEditor();
                 }
@@ -1086,9 +1231,10 @@ pub fn build(b: *std.Build) void {
         }
 
         function layoutEditor() {
-            if (editorInstance) {
-                setTimeout(() => editorInstance.layout(), 10);
-            }
+            setTimeout(() => {
+                if (editorInstance) editorInstance.layout();
+                if (editorInstanceSecondary) editorInstanceSecondary.layout();
+            }, 10);
         }
 
         // Panel Toggle Actions (Collapse / Expand / Maximize)
@@ -1310,6 +1456,10 @@ pub fn build(b: *std.Build) void {
 
         function selectFile(key) {
             if (!monacoModels[key]) return;
+            if (activeFocusedPane === 'secondary' && isEditorSplit) {
+                selectSecondaryFile(key);
+                return;
+            }
             activeFileKey = key;
             
             if (editorInstance) {
@@ -1323,6 +1473,7 @@ pub fn build(b: *std.Build) void {
             document.getElementById('ast-active-label').innerText = key;
             document.getElementById('compiler-active-file').innerText = `[${key}]`;
             updateZirAndAsm();
+            updateBreadcrumbs(editorInstance, activeFileKey);
 
             if (zlsWebSocket && zlsWebSocket.readyState === WebSocket.OPEN) {
                 zlsWebSocket.send(JSON.stringify({
@@ -1730,6 +1881,10 @@ main:
                 <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded ${isCanaryCorrupted ? 'bg-red-500' : 'bg-pink-500'}"></span><span>Canary</span></div>
                 <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded bg-[#151821] border border-[#242936]"></span><span>Free</span></div>
             `;
+
+            if (heapViewMode === 'hex') {
+                renderRawHexDump();
+            }
         }
 
         function drawProfilerTimeline() {
@@ -2194,8 +2349,599 @@ main:
             if (vp) vp.scrollTop = vp.scrollHeight;
         }
 
+        // ====================================================================
+        // v0.3 ADVANCED MULTI-PANE SPLIT EDITOR ENGINE
+        // ====================================================================
+        function toggleSplitEditor() {
+            isEditorSplit = !isEditorSplit;
+            const paneSecondary = document.getElementById('pane-secondary');
+            const resizerSplit = document.getElementById('resizer-editor-split');
+            const splitBtn = document.getElementById('btn-split-editor');
+            const splitHdrBtn = document.getElementById('toggle-btn-split-hdr');
+
+            if (isEditorSplit) {
+                paneSecondary.classList.remove('hidden');
+                paneSecondary.classList.add('flex');
+                resizerSplit.classList.remove('hidden');
+
+                if (splitBtn) {
+                    splitBtn.classList.add('bg-[#f7a41d]/20', 'text-[#f7a41d]', 'border-[#f7a41d]/40');
+                    splitBtn.classList.remove('text-[#4ea8de]');
+                }
+                if (splitHdrBtn) {
+                    splitHdrBtn.classList.add('bg-[#f7a41d]/20', 'text-[#f7a41d]');
+                    splitHdrBtn.classList.remove('text-[#4ea8de]');
+                }
+
+                if (!editorInstanceSecondary) {
+                    editorInstanceSecondary = monaco.editor.create(document.getElementById('monaco-secondary-root'), {
+                        model: monacoModels[activeSecondaryFileKey] || monacoModels["src/build.zig"],
+                        theme: 'zig-studio-dark',
+                        fontSize: 13,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        lineNumbers: 'on',
+                        roundedSelection: true,
+                        scrollBeyondLastLine: false,
+                        tabSize: 4,
+                        insertSpaces: true,
+                        automaticLayout: true,
+                        minimap: { enabled: false }
+                    });
+
+                    editorInstanceSecondary.onDidChangeCursorPosition(e => {
+                        document.getElementById('footer-cursor-line').innerText = e.position.lineNumber;
+                        document.getElementById('footer-cursor-col').innerText = e.position.column;
+                        updateBreadcrumbs(editorInstanceSecondary, activeSecondaryFileKey);
+                    });
+
+                    editorInstanceSecondary.onDidFocusEditorWidget(() => {
+                        activeFocusedPane = 'secondary';
+                        updateActivePaneIndicator();
+                        updateBreadcrumbs(editorInstanceSecondary, activeSecondaryFileKey);
+                    });
+                } else {
+                    editorInstanceSecondary.setModel(monacoModels[activeSecondaryFileKey] || monacoModels["src/build.zig"]);
+                }
+
+                renderSecondaryTabs();
+                activeFocusedPane = 'secondary';
+                updateActivePaneIndicator();
+                updateBreadcrumbs(editorInstanceSecondary, activeSecondaryFileKey);
+            } else {
+                paneSecondary.classList.add('hidden');
+                paneSecondary.classList.remove('flex');
+                resizerSplit.classList.add('hidden');
+                const panePrimary = document.getElementById('pane-primary');
+                if (panePrimary) {
+                    panePrimary.style.flex = '1 1 0%';
+                    panePrimary.style.width = '';
+                }
+                if (splitBtn) {
+                    splitBtn.classList.remove('bg-[#f7a41d]/20', 'text-[#f7a41d]', 'border-[#f7a41d]/40');
+                    splitBtn.classList.add('text-[#4ea8de]');
+                }
+                if (splitHdrBtn) {
+                    splitHdrBtn.classList.remove('bg-[#f7a41d]/20', 'text-[#f7a41d]');
+                    splitHdrBtn.classList.add('text-[#4ea8de]');
+                }
+                activeFocusedPane = 'primary';
+                updateActivePaneIndicator();
+                updateBreadcrumbs(editorInstance, activeFileKey);
+            }
+
+            layoutEditor();
+        }
+
+        function renderSecondaryTabs() {
+            const container = document.getElementById('secondary-tabs-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            Object.keys(projectFiles).forEach(key => {
+                const file = projectFiles[key];
+                const isActive = key === activeSecondaryFileKey;
+                const btn = document.createElement('button');
+                btn.onclick = () => selectSecondaryFile(key);
+                btn.className = `px-2.5 py-1 flex items-center space-x-1.5 border-r border-[#242936] text-[11px] font-mono transition ${isActive ? 'bg-[#1a202c] text-white border-t border-t-[#4ea8de]' : 'text-slate-400 hover:text-slate-200 hover:bg-[#151922]'}`;
+                btn.innerHTML = `
+                    <span>${file.icon}</span>
+                    <span>${file.name}</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectSecondaryFile(key) {
+            if (!monacoModels[key]) return;
+            activeSecondaryFileKey = key;
+            if (editorInstanceSecondary) {
+                editorInstanceSecondary.setModel(monacoModels[key]);
+            }
+            renderSecondaryTabs();
+            activeFocusedPane = 'secondary';
+            updateActivePaneIndicator();
+            updateBreadcrumbs(editorInstanceSecondary, activeSecondaryFileKey);
+        }
+
+        function updateActivePaneIndicator() {
+            const ind = document.getElementById('active-pane-indicator');
+            if (!ind) return;
+            if (isEditorSplit) {
+                ind.innerText = `Active Pane: ${activeFocusedPane === 'primary' ? '1 (Left)' : '2 (Right)'}`;
+                ind.className = activeFocusedPane === 'primary' ? 'text-cyan-400 font-bold' : 'text-[#f7a41d] font-bold';
+            } else {
+                ind.innerText = `Pane: Full (Single)`;
+                ind.className = 'text-slate-400';
+            }
+        }
+
+        // ====================================================================
+        // v0.3 STICKY AST BREADCRUMBS & SCOPE BAR
+        // ====================================================================
+        function updateBreadcrumbs(editor, fileKey) {
+            if (!editor || !editor.getModel()) return;
+            const model = editor.getModel();
+            const pos = editor.getPosition();
+            const line = pos ? pos.lineNumber : 1;
+            const filename = (fileKey || activeFileKey).split('/').pop();
+
+            const fnElem = document.getElementById('breadcrumb-filename');
+            if (fnElem) fnElem.innerText = filename;
+
+            let foundScope = 'global scope';
+            const totalLines = model.getLineCount();
+            for (let l = Math.min(line, totalLines); l >= 1; l--) {
+                const text = model.getLineContent(l).trim();
+                const fnMatch = text.match(/(?:pub\s+)?fn\s+([A-Za-z0-9_]+)/);
+                if (fnMatch) {
+                    foundScope = `ƒ ${fnMatch[1]}()`;
+                    break;
+                }
+                const structMatch = text.match(/(?:pub\s+)?(?:const|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:extern\s+|packed\s+)?struct/);
+                if (structMatch) {
+                    foundScope = `⚡ ${structMatch[1]}`;
+                    break;
+                }
+                const testMatch = text.match(/test\s+"([^"]+)"/);
+                if (testMatch) {
+                    foundScope = `🧪 "${testMatch[1]}"`;
+                    break;
+                }
+            }
+
+            const symbolElem = document.getElementById('breadcrumb-symbol');
+            if (symbolElem) symbolElem.innerText = foundScope;
+        }
+
+        // ====================================================================
+        // v0.3 RAW HEX MEMORY DUMP VISUALIZER
+        // ====================================================================
+        function setHeapViewMode(mode) {
+            heapViewMode = mode;
+            const gridWrap = document.getElementById('heap-view-grid-wrapper');
+            const hexWrap = document.getElementById('heap-view-hex-wrapper');
+            const btnGrid = document.getElementById('btn-heap-mode-grid');
+            const btnHex = document.getElementById('btn-heap-mode-hex');
+
+            if (mode === 'hex') {
+                if (gridWrap) gridWrap.classList.add('hidden');
+                if (hexWrap) hexWrap.classList.remove('hidden');
+                if (btnHex) btnHex.className = "flex-1 py-1 text-[10px] font-mono rounded bg-[#1e2433] text-white transition";
+                if (btnGrid) btnGrid.className = "flex-1 py-1 text-[10px] font-mono rounded text-slate-400 hover:text-slate-200 transition";
+                renderRawHexDump();
+            } else {
+                if (hexWrap) hexWrap.classList.add('hidden');
+                if (gridWrap) gridWrap.classList.remove('hidden');
+                if (btnGrid) btnGrid.className = "flex-1 py-1 text-[10px] font-mono rounded bg-[#1e2433] text-white transition";
+                if (btnHex) btnHex.className = "flex-1 py-1 text-[10px] font-mono rounded text-slate-400 hover:text-slate-200 transition";
+                renderHeapGrid();
+            }
+        }
+
+        function renderRawHexDump() {
+            const container = document.getElementById('heap-hex-dump-container');
+            if (!container) return;
+            if (heapBlocks.length === 0) initHeapBlocks();
+
+            container.innerHTML = '';
+
+            heapBlocks.forEach((b, idx) => {
+                const row = document.createElement('div');
+                row.className = "flex items-center space-x-1.5 py-0.5 hover:bg-[#1a1f2c] rounded px-1 group transition cursor-pointer";
+                row.title = `[0x${b.addr}] ${b.label} (${b.size})\nOwner: ${b.owner}`;
+
+                const addrCol = document.createElement('span');
+                addrCol.className = "text-slate-500 flex-shrink-0 w-20";
+                addrCol.innerText = `0x${b.addr}:`;
+
+                const bytesCol = document.createElement('span');
+                bytesCol.className = "flex items-center space-x-0.5 flex-1";
+
+                let hexBytes = [];
+                let asciiChars = [];
+                let colorClass = 'text-slate-600';
+
+                if (b.type === 'metadata') {
+                    colorClass = 'text-[#f7a41d]';
+                    hexBytes = ['01', '00', '00', '00', '10', '00', '00', '00', 'A0', '7F', 'FF', '00', '00', '00', '00', '00'];
+                    asciiChars = ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'];
+                } else if (b.type === 'user') {
+                    colorClass = 'text-[#4ea8de]';
+                    if (idx === 2) {
+                        hexBytes = ['5A', '49', '47', '20', '53', '54', '55', '44', '49', '4F', '20', '56', '30', '2E', '33', '21'];
+                        asciiChars = ['Z', 'I', 'G', ' ', 'S', 'T', 'U', 'D', 'I', 'O', ' ', 'V', '0', '.', '3', '!'];
+                    } else {
+                        hexBytes = ['3F', '80', '00', '00', '40', '00', '00', '00', '40', '40', '00', '00', '40', '80', '00', '00'];
+                        asciiChars = ['?', '.', '.', '.', '@', '.', '.', '.', '@', '@', '.', '.', '@', '.', '.', '.'];
+                    }
+                } else if (b.type === 'canary') {
+                    if (isCanaryCorrupted) {
+                        colorClass = 'text-red-400 font-bold animate-pulse';
+                        hexBytes = ['DE', 'AD', 'BE', 'EF', 'CA', 'FE', 'BA', 'BE', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA'];
+                        asciiChars = ['!', '!', '!', '!', '!', '!', '!', '!', '.', '.', '.', '.', '.', '.', '.', '.'];
+                    } else {
+                        colorClass = 'text-pink-400 font-semibold';
+                        hexBytes = ['AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA', 'AA'];
+                        asciiChars = ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'];
+                    }
+                } else if (b.type === 'leak') {
+                    colorClass = 'text-red-400 font-bold animate-pulse';
+                    hexBytes = ['DE', 'AD', 'C0', 'DE', '4C', '45', '41', '4B', '00', '00', '00', '00', '00', '00', '00', '00'];
+                    asciiChars = ['.', '.', '.', '.', 'L', 'E', 'A', 'K', '.', '.', '.', '.', '.', '.', '.', '.'];
+                } else {
+                    colorClass = 'text-slate-600';
+                    hexBytes = ['00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00', '00'];
+                    asciiChars = ['.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.'];
+                }
+
+                const b1 = hexBytes.slice(0, 8).join(' ');
+                const b2 = hexBytes.slice(8, 16).join(' ');
+                bytesCol.innerHTML = `<span class="${colorClass}">${b1}</span><span class="text-slate-700 mx-1">|</span><span class="${colorClass}">${b2}</span>`;
+
+                const asciiCol = document.createElement('span');
+                asciiCol.className = "text-slate-400 w-24 text-right flex-shrink-0";
+                asciiCol.innerText = `|${asciiChars.join('')}|`;
+
+                row.appendChild(addrCol);
+                row.appendChild(bytesCol);
+                row.appendChild(asciiCol);
+                container.appendChild(row);
+            });
+        }
+
+        // ====================================================================
+        // v0.3 FUZZY QUICK OPEN & COMMAND PALETTE ENGINE
+        // ====================================================================
+        const paletteCommands = [
+            { type: 'cmd', label: 'View: Toggle Split Editor Panes', shortcut: 'Ctrl+\\', action: () => toggleSplitEditor() },
+            { type: 'cmd', label: 'View: Toggle Distraction-Free Zen Mode', shortcut: 'Alt+Z', action: () => toggleZenMode() },
+            { type: 'cmd', label: 'View: Raw Hex Memory Dump', shortcut: 'Alt+H', action: () => setHeapViewMode('hex') },
+            { type: 'cmd', label: 'View: 32-Cell Heap Grid', shortcut: '', action: () => setHeapViewMode('grid') },
+            { type: 'cmd', label: 'View: Toggle Left Sidebar', shortcut: 'Ctrl+B', action: () => toggleLeftSidebar() },
+            { type: 'cmd', label: 'View: Toggle Terminal Drawer', shortcut: '', action: () => toggleTerminalPanel() },
+            { type: 'cmd', label: 'View: Toggle Right Tools Inspector', shortcut: '', action: () => toggleRightSidebar() },
+            { type: 'cmd', label: 'View: Open std.Build DAG Visualizer', shortcut: '', action: () => switchMainView('dag') },
+            { type: 'cmd', label: 'View: Open Compiler Explorer (ZIR / Assembly)', shortcut: '', action: () => switchMainView('zir') },
+            { type: 'cmd', label: 'View: Switch to Code Editor', shortcut: '', action: () => switchMainView('editor') },
+            { type: 'cmd', label: 'Target: Switch to x86_64-linux-gnu', shortcut: '', action: () => setTargetTriple('x86_64-linux-gnu') },
+            { type: 'cmd', label: 'Target: Switch to x86_64-windows-gnu', shortcut: '', action: () => setTargetTriple('x86_64-windows-gnu') },
+            { type: 'cmd', label: 'Target: Switch to aarch64-macos.none', shortcut: '', action: () => setTargetTriple('aarch64-macos.none') },
+            { type: 'cmd', label: 'Target: Switch to wasm32-freestanding', shortcut: '', action: () => setTargetTriple('wasm32-freestanding') },
+            { type: 'cmd', label: 'Target: Switch to riscv64-linux-musl', shortcut: '', action: () => setTargetTriple('riscv64-linux-musl') },
+            { type: 'cmd', label: 'Optimize: Debug Mode (full safety checks)', shortcut: '', action: () => setBuildMode('Debug') },
+            { type: 'cmd', label: 'Optimize: ReleaseSafe Mode', shortcut: '', action: () => setBuildMode('ReleaseSafe') },
+            { type: 'cmd', label: 'Optimize: ReleaseFast Mode (-O3)', shortcut: '', action: () => setBuildMode('ReleaseFast') },
+            { type: 'cmd', label: 'Optimize: ReleaseSmall Mode (-Oz, 22 KB)', shortcut: '', action: () => setBuildMode('ReleaseSmall') },
+            { type: 'cmd', label: 'Allocator: Switch to GeneralPurposeAllocator (GPA)', shortcut: '', action: () => { document.getElementById('allocator-type-select').value = 'gpa'; onAllocatorSelectChange(); } },
+            { type: 'cmd', label: 'Allocator: Switch to ArenaAllocator', shortcut: '', action: () => { document.getElementById('allocator-type-select').value = 'arena'; onAllocatorSelectChange(); } },
+            { type: 'cmd', label: 'Allocator: Switch to FixedBufferAllocator', shortcut: '', action: () => { document.getElementById('allocator-type-select').value = 'fixed'; onAllocatorSelectChange(); } },
+            { type: 'cmd', label: 'Allocator: Simulate GPA Memory Leak', shortcut: '', action: () => simulateLeak() },
+            { type: 'cmd', label: 'Allocator: Simulate Buffer Canary Overrun', shortcut: '', action: () => simulateCanaryOverrun() },
+            { type: 'cmd', label: 'Allocator: Reset Memory Heap', shortcut: '', action: () => resetHeap() },
+            { type: 'cmd', label: 'Build: Execute zig build run', shortcut: 'F5', action: () => executeZigBuild() },
+            { type: 'cmd', label: 'Build: Execute zig test', shortcut: 'F6', action: () => executeZigTest() }
+        ];
+
+        function setTargetTriple(triple) {
+            const sel = document.getElementById('target-triple-select');
+            if (sel) {
+                sel.value = triple;
+                onTargetTripleChange();
+            }
+        }
+
+        function openCommandPalette(mode) {
+            paletteMode = mode;
+            paletteSelectedIndex = 0;
+            const modal = document.getElementById('command-palette-modal');
+            const input = document.getElementById('palette-input');
+            const icon = document.getElementById('palette-icon');
+            const hint = document.getElementById('palette-mode-hint');
+
+            if (!modal || !input) return;
+
+            modal.classList.remove('hidden');
+            input.value = '';
+            input.focus();
+
+            if (mode === 'file') {
+                icon.innerText = '📄';
+                input.placeholder = 'Search file name... (e.g. main, tracker, fast_c)';
+                hint.innerText = 'Files Mode (Ctrl+P) · Type > for commands';
+            } else {
+                icon.innerText = '❯';
+                input.placeholder = 'Type a command... (e.g. Split, Target, Hex, Leak)';
+                hint.innerText = 'Commands Mode (Ctrl+Shift+P)';
+            }
+
+            renderPaletteResults();
+        }
+
+        function closeCommandPalette() {
+            const modal = document.getElementById('command-palette-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function onPaletteBackdropClick(e) {
+            closeCommandPalette();
+        }
+
+        function setupPaletteInput() {
+            const input = document.getElementById('palette-input');
+            if (input) {
+                input.addEventListener('input', () => {
+                    paletteSelectedIndex = 0;
+                    renderPaletteResults();
+                });
+            }
+        }
+
+        function renderPaletteResults() {
+            const container = document.getElementById('palette-results');
+            const input = document.getElementById('palette-input');
+            if (!container || !input) return;
+
+            const query = input.value.trim().toLowerCase();
+            container.innerHTML = '';
+
+            let items = [];
+
+            if (query.startsWith('>')) {
+                paletteMode = 'command';
+                const cleanQuery = query.substring(1).trim();
+                items = paletteCommands.filter(c => c.label.toLowerCase().includes(cleanQuery));
+            } else if (paletteMode === 'file') {
+                items = Object.keys(projectFiles).map(k => ({
+                    type: 'file',
+                    key: k,
+                    label: projectFiles[k].name,
+                    sublabel: k,
+                    icon: projectFiles[k].icon,
+                    action: () => {
+                        if (activeFocusedPane === 'secondary' && isEditorSplit) {
+                            selectSecondaryFile(k);
+                        } else {
+                            selectFile(k);
+                        }
+                    }
+                })).filter(f => f.label.toLowerCase().includes(query) || f.sublabel.toLowerCase().includes(query));
+            } else {
+                items = paletteCommands.filter(c => c.label.toLowerCase().includes(query));
+            }
+
+            filteredPaletteItems = items;
+            if (paletteSelectedIndex >= items.length) paletteSelectedIndex = Math.max(0, items.length - 1);
+
+            if (items.length === 0) {
+                container.innerHTML = `<div class="p-3 text-center text-slate-500 font-mono text-xs">No matching results found</div>`;
+                return;
+            }
+
+            items.forEach((item, idx) => {
+                const isSelected = idx === paletteSelectedIndex;
+                const row = document.createElement('div');
+                row.className = `p-2 rounded cursor-pointer flex items-center justify-between transition ${isSelected ? 'bg-[#f7a41d]/15 text-[#f7a41d] border border-[#f7a41d]/30 font-bold' : 'text-slate-300 hover:bg-[#161a24]'}`;
+                row.onclick = () => {
+                    closeCommandPalette();
+                    item.action();
+                };
+
+                if (item.type === 'file') {
+                    row.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                            <span>${item.icon}</span>
+                            <span class="font-medium">${item.label}</span>
+                            <span class="text-[10px] text-slate-500 font-normal">(${item.sublabel})</span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 font-mono">File</span>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[#f7a41d]">❯</span>
+                            <span>${item.label}</span>
+                        </div>
+                        ${item.shortcut ? `<span class="text-[10px] bg-[#1a1f2c] border border-[#242936] text-slate-400 px-1.5 py-0.5 rounded font-mono">${item.shortcut}</span>` : ''}
+                    `;
+                }
+
+                container.appendChild(row);
+            });
+        }
+
+        // ====================================================================
+        // v0.3 DISTRACTION-FREE ZEN MODE
+        // ====================================================================
+        function toggleZenMode() {
+            isZenMode = !isZenMode;
+            const header = document.querySelector('header');
+            const leftSidebar = document.getElementById('left-sidebar');
+            const resizerLeft = document.getElementById('resizer-left');
+            const rightSidebar = document.getElementById('right-sidebar');
+            const resizerRight = document.getElementById('resizer-right');
+            const terminalPanel = document.getElementById('terminal-panel');
+            const resizerBottom = document.getElementById('resizer-bottom');
+            const footer = document.querySelector('footer');
+            const exitPill = document.getElementById('zen-exit-pill');
+            const zenBtn = document.getElementById('btn-zen-toggle');
+            const zenHdrBtn = document.getElementById('toggle-btn-zen-hdr');
+
+            if (isZenMode) {
+                if (header) header.classList.add('hidden');
+                if (leftSidebar) leftSidebar.classList.add('hidden');
+                if (resizerLeft) resizerLeft.classList.add('hidden');
+                if (rightSidebar) rightSidebar.classList.add('hidden');
+                if (resizerRight) resizerRight.classList.add('hidden');
+                if (terminalPanel) terminalPanel.classList.add('hidden');
+                if (resizerBottom) resizerBottom.classList.add('hidden');
+                if (footer) footer.classList.add('hidden');
+                if (exitPill) exitPill.classList.remove('hidden');
+                if (zenBtn) zenBtn.classList.add('bg-emerald-500/30', 'border-emerald-400');
+                if (zenHdrBtn) zenHdrBtn.classList.add('bg-emerald-500/30');
+            } else {
+                if (header) header.classList.remove('hidden');
+                if (leftSidebar && !isLeftCollapsed) leftSidebar.classList.remove('hidden');
+                if (resizerLeft && !isLeftCollapsed) resizerLeft.classList.remove('hidden');
+                if (rightSidebar && !isRightCollapsed) rightSidebar.classList.remove('hidden');
+                if (resizerRight && !isRightCollapsed) resizerRight.classList.remove('hidden');
+                if (terminalPanel && !isTerminalCollapsed) terminalPanel.classList.remove('hidden');
+                if (resizerBottom && !isTerminalCollapsed) resizerBottom.classList.remove('hidden');
+                if (footer) footer.classList.remove('hidden');
+                if (exitPill) exitPill.classList.add('hidden');
+                if (zenBtn) zenBtn.classList.remove('bg-emerald-500/30', 'border-emerald-400');
+                if (zenHdrBtn) zenHdrBtn.classList.remove('bg-emerald-500/30');
+            }
+
+            layoutEditor();
+        }
+
+        // ====================================================================
+        // v0.3 GLOBAL KEYBOARD SHORTCUT DISPATCHER
+        // ====================================================================
+        window.addEventListener('keydown', (e) => {
+            // Escape closes palette or exits Zen mode
+            if (e.key === 'Escape') {
+                const pal = document.getElementById('command-palette-modal');
+                if (pal && !pal.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closeCommandPalette();
+                    return;
+                }
+                if (isZenMode) {
+                    e.preventDefault();
+                    toggleZenMode();
+                    return;
+                }
+            }
+
+            // Ctrl+P: Quick Open Files
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p' && !e.shiftKey) {
+                e.preventDefault();
+                openCommandPalette('file');
+                return;
+            }
+
+            // Ctrl+Shift+P: Command Palette
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key.toLowerCase() === 'p' || e.code === 'KeyP')) {
+                e.preventDefault();
+                openCommandPalette('command');
+                return;
+            }
+
+            // Ctrl+\: Toggle Split Editor
+            if ((e.ctrlKey || e.metaKey) && (e.key === '\\' || e.code === 'Backslash')) {
+                e.preventDefault();
+                toggleSplitEditor();
+                return;
+            }
+
+            // Alt+Z: Toggle Zen Mode
+            if (e.altKey && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                toggleZenMode();
+                return;
+            }
+
+            // Alt+H: Toggle Hex Dump
+            if (e.altKey && e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                setHeapViewMode(heapViewMode === 'hex' ? 'grid' : 'hex');
+                return;
+            }
+
+            // Ctrl+B: Toggle Left Sidebar
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                toggleLeftSidebar();
+                return;
+            }
+
+            // Ctrl+1: Focus Primary Editor
+            if ((e.ctrlKey || e.metaKey) && e.key === '1') {
+                e.preventDefault();
+                if (editorInstance) editorInstance.focus();
+                activeFocusedPane = 'primary';
+                updateActivePaneIndicator();
+                return;
+            }
+
+            // Ctrl+2: Focus Secondary Editor
+            if ((e.ctrlKey || e.metaKey) && e.key === '2' && isEditorSplit) {
+                e.preventDefault();
+                if (editorInstanceSecondary) editorInstanceSecondary.focus();
+                activeFocusedPane = 'secondary';
+                updateActivePaneIndicator();
+                return;
+            }
+
+            // Modal navigation if open
+            const modal = document.getElementById('command-palette-modal');
+            if (modal && !modal.classList.contains('hidden')) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    paletteSelectedIndex = (paletteSelectedIndex + 1) % Math.max(1, filteredPaletteItems.length);
+                    renderPaletteResults();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    paletteSelectedIndex = (paletteSelectedIndex - 1 + Math.max(1, filteredPaletteItems.length)) % Math.max(1, filteredPaletteItems.length);
+                    renderPaletteResults();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (filteredPaletteItems.length > 0 && filteredPaletteItems[paletteSelectedIndex]) {
+                        const item = filteredPaletteItems[paletteSelectedIndex];
+                        closeCommandPalette();
+                        item.action();
+                    }
+                }
+            }
+        });
+
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s; return d.innerHTML; }
     </script>
+
+    <!-- COMMAND PALETTE & QUICK OPEN MODAL -->
+    <div id="command-palette-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center pt-16 hidden" onclick="onPaletteBackdropClick(event)">
+        <div class="bg-[#12151c] border border-[#2d3446] rounded-xl shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in duration-100 flex flex-col" onclick="event.stopPropagation()">
+            <div class="p-3 border-b border-[#242936] flex items-center space-x-2.5 bg-[#0c0e14]">
+                <span id="palette-icon" class="text-sm font-mono font-bold text-[#f7a41d]">❯</span>
+                <input type="text" id="palette-input" class="bg-transparent text-sm text-slate-100 placeholder-slate-500 font-mono outline-none flex-1" placeholder="Type a file name or command..." autocomplete="off" spellcheck="false" />
+                <span class="text-[10px] text-slate-400 font-mono bg-[#1c2230] px-2 py-0.5 rounded border border-[#2a3346]">ESC</span>
+            </div>
+            <div id="palette-results" class="max-h-80 overflow-y-auto p-1.5 text-xs font-mono divide-y divide-[#1e2433]/40"></div>
+            <div class="bg-[#0c0e14] px-3 py-1.5 border-t border-[#242936] flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                <span>↑↓ navigate · ↵ select · ESC close</span>
+                <span id="palette-mode-hint">Files Mode (Ctrl+P) · Type > for commands</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ZEN MODE FLOATING RESTORE PILL -->
+    <div id="zen-exit-pill" class="fixed top-3 right-4 z-50 hidden">
+        <button onclick="toggleZenMode()" class="px-3.5 py-1.5 bg-[#12151c]/90 hover:bg-[#1e2433] text-slate-200 border border-[#f7a41d]/50 shadow-2xl rounded-full text-xs font-mono flex items-center space-x-2 backdrop-blur transition hover:scale-105">
+            <span class="text-[#f7a41d]">⚡</span>
+            <span>Exit Zen Mode (Alt+Z)</span>
+        </button>
+    </div>
 </body>
 </html>

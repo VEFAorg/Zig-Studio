@@ -28,23 +28,66 @@ To earn the respect of Andrew Kelley, Jarred Sumner, and the Zig Software Founda
 ## 2. Release Milestones: Path to v1.0
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│      v0.2       │ ──> │      v0.4       │ ──> │      v0.7       │ ──> │      v1.0       │
-│ Current Concept │     │ Developer Alpha │     │  Beta / Systems │     │ Production MVP  │
-│  - Target Matrix│     │  - Native ZLS   │     │  - Memory Profil│     │  - Desktop Dist │
-│  - Mock Engine  │     │  - Real PTY CLI │     │  - Comptime VM  │     │  - Bun Testbed  │
-│  - DAG & ZIR    │     │  - File Watcher │     │  - C Struct Map │     │  - Daily Driver │
-└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│      v0.2       │ ──> │      v0.3       │ ──> │      v0.4       │ ──> │      v0.7       │ ──> │      v1.0       │
+│ Current Concept │     │ UI & Memory Exp │     │ Developer Alpha │     │  Beta / Systems │     │ Production MVP  │
+│  - Target Matrix│     │  - Split Panes  │     │  - zig.wasm VM  │     │  - Memory Profil│     │  - Desktop Dist │
+│  - Mock Engine  │     │  - Hex Mem Dump │     │  - Native ZLS   │     │  - Comptime VM  │     │  - Bun Testbed  │
+│  - DAG & ZIR    │     │  - Command Pal  │     │  - PTY & Sandbox│     │  - C Struct Map │     │  - Daily Driver │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
 ---
 
-## Milestone 1 (v0.4) — Developer Alpha: Real Toolchain & Native ZLS
+## Milestone 1 (v0.3) — Visualizer Fidelity & Multi-Pane Architecture
 
-*Goal: Make Zig Studio capable of editing, building, and debugging real Zig projects stored on local disk.*
+*Goal: Transform the single-editor prototype into a multi-pane, keyboard-driven systems workspace with raw byte inspection.*
 
-### 1.1 Bi-Directional Native ZLS Engine
-- **JSON-RPC 2.0 Streaming**: Complete IPC connection to a locally running `zls` daemon via standard I/O pipes or local domain sockets (`\\.\pipe\zls` on Windows, `/tmp/zls.sock` on Linux/macOS).
+### 1.1 Split Editor Panes (Side-by-Side Multi-Model)
+- Side-by-side dual Monaco editor panes enabling simultaneous editing of source files (e.g. `main.zig` alongside `build.zig` or `tracker.zig`).
+- Independent model attachment, cursor positions, scroll offsets, and active file indicators.
+- Synchronized keyboard shortcuts for focus swapping (`Ctrl+\`, `Ctrl+1`, `Ctrl+2`).
+
+### 1.2 Raw Hex Memory Dump Visualizer
+- Add byte-level hex memory dump tab to the Heap Inspector Tracer.
+- 16-byte aligned rows with hex byte values and printable ASCII sidebar.
+- Visual highlighting of:
+  - Active allocated blocks (cyan).
+  - GPA guard canaries `0xAA` (yellow).
+  - Corrupted or freed memory (red).
+  - Unmapped memory (dimmed).
+
+### 1.3 Quick Open & Fuzzy Command Palette (`Ctrl+P` / `Ctrl+Shift+P`)
+- Keyboard-first command palette matching VS Code / Sublime muscle memory.
+- File navigation (`Ctrl+P`) with fuzzy matching across workspace files.
+- Command execution (`Ctrl+Shift+P`) for target triple switching, allocator toggling, split pane manipulation, and build step execution.
+
+### 1.4 Sticky Breadcrumbs & Scope Bar
+- In-editor breadcrumb bar displaying syntax hierarchy: `src > main.zig > Server > listen()`.
+- Clickable breadcrumbs to jump directly to struct or function definitions.
+
+### 1.5 Distraction-Free Zen Mode
+- Single-key toggle (`Alt+Z` / `F11`) to collapse sidebars, status bars, and terminals into a full-screen, distraction-free code canvas.
+
+---
+
+## Milestone 2 (v0.4) — Developer Alpha: Real Toolchain, WebAssembly & Sandboxing
+
+*Goal: Make Zig Studio capable of running real Zig compilations client-side via WebAssembly and in ephemeral backend micro-VMs.*
+
+### 2.1 In-Browser WebAssembly Compiler (`zig.wasm`)
+- Freestanding WebAssembly compilation of the Zig compiler frontend using WASI linear memory.
+- Enables zero-install, client-side compilation and unit testing (`zig test`) directly in any web browser without server backend dependencies.
+
+### 2.2 Ephemeral Sandboxed Cloud Execution
+- Ephemeral containerized micro-VM runner (Firecracker / Podman with strict cgroups ceilings) to safely execute native `zig build run` without remote code execution (RCE) vectors.
+
+### 2.3 Ultra-Lean Native Desktop Distribution (WebKit / WebView2)
+- Standalone desktop application packaged via Tauri v2 or native Zig + WebKit/WebView2.
+- Startup latency under **15 milliseconds**, idle RAM consumption under **40 MB** (strictly rejecting bloated 500MB+ Electron packaging).
+
+### 2.4 Bi-Directional Native ZLS Engine
+- **JSON-RPC 2.0 Streaming**: Direct IPC connection to a locally running `zls` daemon via standard I/O pipes or local domain sockets (`\\.\pipe\zls` on Windows, `/tmp/zls.sock` on Linux/macOS).
 - **Semantic Token Engine**: Precise AST-derived syntax coloring (distinguishing `@comptime` variables, primitive types, function pointers, and error unions).
 - **Code Intelligence**:
   - `textDocument/definition` (Go-to-Definition across Zig and C header boundaries).
@@ -52,37 +95,37 @@ To earn the respect of Andrew Kelley, Jarred Sumner, and the Zig Software Founda
   - `textDocument/rename` (Global symbol renaming with cross-file safety).
   - `textDocument/codeAction` (Autofix missing error sets, autofix discarded values `_ = foo;`, and auto-generate missing struct fields).
 
-### 1.2 Interactive PTY Terminal & Task Runner
-- Replace simulated terminal logs with a real pseudo-terminal (xterm.js backed by `node-pty` or a native Zig PTY backend).
+### 2.5 Interactive PTY Terminal & Task Runner
+- Real pseudo-terminal (xterm.js backed by `node-pty` or a native Zig PTY backend).
 - Real-time ANSI color escapes, cursor positioning, and raw keyboard interaction.
 - Direct execution pipelines for:
   - `zig build` (with full `--summary all` tree parsing).
   - `zig test` (capturing test failure stack traces and linking directly to editor line numbers).
   - `zig run` (interactive console I/O).
 
-### 1.3 Local Filesystem Sync & File Watcher
+### 2.6 Local Filesystem Sync & File Watcher
 - Native file tree connected directly to project directories on disk.
 - Debounced file-system watcher (`ReadDirectoryChangesW` on Windows / `inotify` on Linux / `kqueue` on macOS) to handle external git checkouts and branch switching cleanly.
 
 ---
 
-## Milestone 2 (v0.7) — Systems Engineering Suite: Memory & Comptime
+## Milestone 3 (v0.7) — Systems Engineering Suite: Memory & Comptime
 
 *Goal: Implement the bespoke tooling that no other IDE provides, specifically for explicit allocators and compile-time evaluation.*
 
-### 2.1 The Bun-Grade Allocator Profiler
+### 3.1 The Bun-Grade Allocator Profiler
 - **Live Memory Event Hooks**: Connect to `std.heap.GeneralPurposeAllocator` and custom allocators via a lightweight runtime telemetry agent.
 - **Allocation Flamegraphs**: Real-time stack trace attribution for every allocated byte.
 - **Allocator Fragmentation & Churn Heatmap**: Visualizing virtual page utilization across `GeneralPurposeAllocator`, `ArenaAllocator`, `FixedBufferAllocator`, and `c_allocator`.
 - **Zero-Allocation Hot Path Verifier**: Static analysis mode that inspects a designated loop or function and asserts that 0 heap allocations occur during execution.
 
-### 2.2 Comptime Time-Travel Debugger & Monomorphization Tree
+### 3.2 Comptime Time-Travel Debugger & Monomorphization Tree
 - **Comptime Execution Stepper**: Set breakpoints inside `@comptime` expressions and step through the compiler's compile-time interpreter.
 - **Monomorphization Tree Inspector**:
   - Visual hierarchy of all generic struct and function instantiations across the codebase (e.g., viewing all instantiated shapes of `ArrayList(T)` or `Matrix(M, N, T)`).
   - Identification of generic template bloat and binary footprint attribution per specialization.
 
-### 2.3 C ABI & Struct Layout Visualizer (The Sumner Engine)
+### 3.3 C ABI & Struct Layout Visualizer (The Sumner Engine)
 - **Live `@cImport` Expansion**: Instant side-by-side inspection showing exactly what C header files expand to in Zig syntax.
 - **Cache-Line & Padding Inspector**:
   - Graphical representation of struct byte alignment, field offsets, and padding holes.
@@ -90,11 +133,11 @@ To earn the respect of Andrew Kelley, Jarred Sumner, and the Zig Software Founda
 
 ---
 
-## Milestone 3 (v0.9) — Production Build Engine & Package Hub
+## Milestone 4 (v0.9) — Production Build Engine & Package Hub
 
 *Goal: Full support for the modern Zig package manager and complex multi-target build graphs.*
 
-### 3.1 Interactive `std.Build` DAG Orchestrator
+### 4.1 Interactive `std.Build` DAG Orchestrator
 - Live visual graph editor for `build.zig`.
 - Support for complex dependency graphs:
   - C library compilation steps (`addCSourceFiles`).
@@ -102,18 +145,18 @@ To earn the respect of Andrew Kelley, Jarred Sumner, and the Zig Software Founda
   - Code generation steps (`addRunArtifact` generating Zig code before compilation).
 - Single-click build pipeline execution with step-by-step failure highlighting.
 
-### 3.2 Visual `build.zig.zon` Package Hub
+### 4.2 Visual `build.zig.zon` Package Hub
 - Search and browse packages directly from the Zig community package index.
 - Automatic dependency resolution via `zig fetch --save <url>`.
 - Multihash integrity verification (`1220...`) with duplicate dependency conflict warnings.
 
 ---
 
-## Milestone 4 (v1.0 MVP) — The Daily Driver
+## Milestone 5 (v1.0 MVP) — The Daily Driver
 
 *Goal: Production distribution, enterprise sandboxing, and real-world validation on the Bun codebase.*
 
-### 4.1 Delivery Architecture & Distribution Model
+### 5.1 Delivery Architecture & Distribution Model
 To meet different workflow demands, Zig Studio v1.0 will provide two first-class distributions:
 1. **Desktop Native (Ultra-Lean)**:
    - Built using a native Zig GUI or ultra-lightweight webview runtime (Tauri v2 / Native Zig + WebKit).
