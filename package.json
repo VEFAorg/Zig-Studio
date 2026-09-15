@@ -1,0 +1,33 @@
+{
+  "name": "zig-studio",
+  "version": "0.2.0",
+  "description": "The Bespoke Web & Desktop IDE for the Zig Programming Language & Toolchain",
+  "main": "index.html",
+  "scripts": {
+    "start": "node zls_bridge.js",
+    "serve": "npx serve .",
+    "test": "node zls_bridge.js --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VEFAorg/zig-studio.git"
+  },
+  "keywords": [
+    "zig",
+    "zls",
+    "ide",
+    "compiler",
+    "bun",
+    "systems-programming",
+    "monaco-editor",
+    "cross-compilation",
+    "comptime",
+    "memory-allocator"
+  ],
+  "authors": [
+    "Devin Damon Shinkle",
+    "VEFAorg",
+    "Antigravity (Google DeepMind)"
+  ],
+  "license": "MIT"
+}

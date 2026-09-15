@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zig Studio v0.2 — The Official Bespoke IDE for the Zig Programming Language</title>
+    <!-- Tailwind CSS for high fidelity layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #090b0f;
+            color: #e2e8f0;
+        }
+        
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f1218;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #242a38;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f7a41d;
+        }
+
+        #monaco-root {
+            width: 100%;
+            height: 100%;
+        }
+
+        .tab-active {
+            background: #0f1115;
+            color: #ffffff;
+            border-top: 2px solid #f7a41d;
+            border-bottom: 1px solid transparent;
+        }
+
+        .tab-inactive {
+            background: #141720;
+            color: #94a3b8;
+            border-top: 2px solid transparent;
+            border-bottom: 1px solid #242936;
+        }
+
+        .tab-inactive:hover {
+            background: #1a1e2b;
+            color: #cbd5e1;
+        }
+
+        .dag-node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            pointer-events: all;
+        }
+        .dag-node:hover rect {
+            stroke: #f7a41d;
+            stroke-width: 2px;
+        }
+
+        /* Draggable Resizer Splitters */
+        .resizer-h {
+            width: 4px;
+            cursor: col-resize;
+            background-color: #1e2433;
+            transition: background-color 0.15s ease;
+            flex-shrink: 0;
+            z-index: 25;
+            position: relative;
+        }
+        .resizer-h:hover, .resizer-h.resizing {
+            background-color: #f7a41d;
+        }
+
+        .resizer-v {
+            height: 4px;
+            cursor: row-resize;
+            background-color: #1e2433;
+            transition: background-color 0.15s ease;
+            flex-shrink: 0;
+            z-index: 25;
+            position: relative;
+        }
+        .resizer-v:hover, .resizer-v.resizing {
+            background-color: #f7a41d;
+        }
+
+        /* Drag handle ghost button */
+        .resizer-h::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 28px;
+            border-left: 1px solid #374151;
+            border-right: 1px solid #374151;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        .resizer-v::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 28px;
+            height: 8px;
+            border-top: 1px solid #374151;
+            border-bottom: 1px solid #374151;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-sm select-none" id="app-body">
+
+    <!-- TOP HEADER & TOOLBAR -->
+    <header class="bg-[#11141b] border-b border-[#242936] px-4 py-2 flex items-center justify-between z-30 shadow-md">
+        
+        <!-- Left: Branding & View Switcher -->
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 bg-gradient-to-br from-[#f7a41d] to-[#d97706] rounded-lg flex items-center justify-center font-bold text-[#0c0e12] text-lg code-font shadow-lg shadow-amber-500/20">
+                    ⚡
+                </div>
+                <div>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="font-extrabold text-white tracking-wider text-base">ZIG STUDIO</span>
+                        <span class="text-[#f7a41d] font-semibold text-[10px] px-1.5 py-0.5 bg-[#f7a41d]/10 rounded border border-[#f7a41d]/20 code-font">v0.2</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono">Bespoke Environment for Andrew Kelley & ZSF</div>
+                </div>
+            </div>
+
+            <!-- Workspace View Switcher (Editor vs std.Build DAG vs Compiler Explorer) -->
+            <div class="flex items-center bg-[#090b0f] p-1 rounded-lg border border-[#242936]">
+                <button onclick="switchMainView('editor')" id="view-btn-editor" class="px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all text-[#f7a41d] bg-[#f7a41d]/15">
+                    Editor
+                </button>
+                <button onclick="switchMainView('dag')" id="view-btn-dag" class="px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200">
+                    std.Build DAG
+                </button>
+                <button onclick="switchMainView('zir')" id="view-btn-zir" class="px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200">
+                    Compiler Explorer (ZIR)
+                </button>
+            </div>
+
+            <!-- Panel Toggle Buttons (Quick Collapse/Expand) -->
+            <div class="hidden xl:flex items-center space-x-1 bg-[#090b0f] p-0.5 rounded border border-[#242936]">
+                <button onclick="toggleLeftSidebar()" id="toggle-btn-left" title="Toggle Left Sidebar (Ctrl+B)" class="px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ◧ Side
+                </button>
+                <button onclick="toggleTerminalPanel()" id="toggle-btn-term" title="Toggle Terminal Drawer" class="px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ⬒ Term
+                </button>
+                <button onclick="toggleRightSidebar()" id="toggle-btn-right" title="Toggle Right Inspector" class="px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ◨ Tools
+                </button>
+            </div>
+        </div>
+
+        <!-- Center: Cross-Compilation Target Triple & 4-Way Build Modes -->
+        <div class="flex items-center space-x-3">
+            
+            <!-- Cross-Compilation Target Selector -->
+            <div class="flex items-center space-x-1.5 bg-[#090b0f] px-2.5 py-1 rounded-lg border border-[#242936]">
+                <span class="text-slate-500 text-xs font-mono">-Dtarget=</span>
+                <select id="target-triple-select" onchange="onTargetTripleChange()" class="bg-transparent text-xs text-[#f7a41d] font-mono focus:outline-none cursor-pointer">
+                    <option value="x86_64-linux-gnu" class="bg-[#11141b] text-slate-200">x86_64-linux-gnu</option>
+                    <option value="x86_64-windows-gnu" class="bg-[#11141b] text-slate-200">x86_64-windows-gnu</option>
+                    <option value="aarch64-macos.none" class="bg-[#11141b] text-slate-200">aarch64-macos.none</option>
+                    <option value="riscv64-linux-musl" class="bg-[#11141b] text-slate-200">riscv64-linux-musl</option>
+                    <option value="wasm32-freestanding" class="bg-[#11141b] text-slate-200">wasm32-freestanding</option>
+                </select>
+            </div>
+
+            <!-- Optimization Modes Selector -->
+            <div class="flex items-center bg-[#090b0f] p-1 rounded-lg border border-[#242936]">
+                <button onclick="setBuildMode('Debug')" id="btn-mode-Debug" class="px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-[#f7a41d] bg-[#f7a41d]/15">
+                    Debug
+                </button>
+                <button onclick="setBuildMode('ReleaseSafe')" id="btn-mode-ReleaseSafe" class="px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200">
+                    ReleaseSafe
+                </button>
+                <button onclick="setBuildMode('ReleaseFast')" id="btn-mode-ReleaseFast" class="px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200">
+                    ReleaseFast
+                </button>
+                <button onclick="setBuildMode('ReleaseSmall')" id="btn-mode-ReleaseSmall" class="px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200">
+                    ReleaseSmall (22 KB)
+                </button>
+            </div>
+
+            <!-- Execute Buttons -->
+            <button onclick="executeZigBuild()" id="btn-build-run" class="flex items-center space-x-1.5 bg-[#f7a41d] hover:bg-[#e09112] text-[#0c0e12] font-bold px-3 py-1.5 rounded-md transition shadow-md shadow-amber-500/20 active:scale-95 text-xs">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                <span>zig build run</span>
+            </button>
+
+            <button onclick="executeZigTest()" id="btn-test-run" class="flex items-center space-x-1.5 bg-[#1a1f2c] hover:bg-[#252b3d] border border-[#374151] text-slate-200 font-semibold px-2.5 py-1.5 rounded-md transition active:scale-95 text-xs">
+                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>zig test</span>
+            </button>
+        </div>
+
+        <!-- Right: Dual-Mode ZLS Bridge Status Button -->
+        <div class="flex items-center space-x-3 text-xs">
+            <button onclick="toggleZlsModal()" id="zls-status-pill" class="flex items-center space-x-2 bg-[#151923] hover:bg-[#1c2230] px-3 py-1.5 rounded-md border border-[#242936] transition cursor-pointer">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" id="zls-status-dot"></span>
+                <span class="text-slate-200 font-mono text-[11px]" id="zls-status-text">ZLS In-Browser (Mock)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN MULTI-PANE IDE CONTAINER WITH RESIZABLE SPLITTERS -->
+    <div class="flex-1 flex overflow-hidden relative" id="workspace-container">
+        
+        <!-- SIDEBAR: FILES, PACKAGES & ARCHITECTURE METRICS -->
+        <aside id="left-sidebar" class="w-64 bg-[#11141b] flex flex-col flex-shrink-0 relative overflow-hidden transition-[width] duration-75">
+            
+            <!-- Sidebar Navigation Tabs (Files vs Packages) -->
+            <div class="flex items-center justify-between border-b border-[#242936] text-[11px] font-mono bg-[#0c0e13]">
+                <div class="grid grid-cols-2 flex-1">
+                    <button onclick="switchSidebarTab('files')" id="side-tab-files" class="py-2 font-bold text-white bg-[#0f1115] border-b-2 border-[#f7a41d] flex items-center justify-center space-x-1">
+                        <span>📁</span>
+                        <span>Files</span>
+                    </button>
+                    <button onclick="switchSidebarTab('packages')" id="side-tab-packages" class="py-2 font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center justify-center space-x-1">
+                        <span>📦</span>
+                        <span>ZON Pkg</span>
+                    </button>
+                </div>
+                <button onclick="toggleLeftSidebar()" class="px-2 text-slate-500 hover:text-slate-300 text-xs" title="Collapse Sidebar">
+                    ◀
+                </button>
+            </div>
+
+            <!-- Tab 1: Project Explorer File Tree -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-1" id="file-tree-container">
+                <!-- Dynamic file list -->
+            </div>
+
+            <!-- Tab 2: ZON Package Manager Container (hidden by default) -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-2 hidden" id="zon-packages-container">
+                <!-- Dynamic ZON package list -->
+            </div>
+
+            <!-- Target Architecture & Build Telemetry Card -->
+            <div class="p-2.5 border-t border-[#242936] bg-[#0c0e13]">
+                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                    <span>⚡ Target Invariants</span>
+                    <span id="telemetry-badge-mode" class="text-[9px] bg-[#f7a41d]/10 text-[#f7a41d] px-1.5 py-0.2 rounded font-mono">Debug</span>
+                </div>
+                <div class="bg-[#11141b] rounded-md p-2 space-y-1 border border-[#242936] text-[11px] font-mono">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Pointer:</span>
+                        <span id="target-ptr-width" class="text-slate-200 font-bold">64-bit</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Triple:</span>
+                        <span id="target-arch-name" class="text-amber-400 text-[10px]">x86_64</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Binary:</span>
+                        <span id="telemetry-binary-size" class="text-white font-bold">142 KB</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-400">Canaries:</span>
+                        <span id="telemetry-canary" class="text-emerald-400">Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Explicit Allocator Selector Bar -->
+            <div class="p-2.5 bg-[#0a0c10] border-t border-[#242936]">
+                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Target Allocator</label>
+                <select id="allocator-type-select" onchange="onAllocatorSelectChange()" class="w-full bg-[#151821] border border-[#242936] rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:border-[#f7a41d] transition">
+                    <option value="gpa">std.heap.GeneralPurposeAllocator</option>
+                    <option value="arena">std.heap.ArenaAllocator</option>
+                    <option value="fixed">std.heap.FixedBufferAllocator</option>
+                    <option value="page">std.heap.page_allocator</option>
+                </select>
+            </div>
+        </aside>
+
+        <!-- RESIZER LEFT (HORIZONTAL DRAG) -->
+        <div id="resizer-left" class="resizer-h" title="Drag to resize sidebar"></div>
+
+        <!-- CENTER MAIN WORKSPACE (EDITOR / STD.BUILD DAG / COMPILER EXPLORER) -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#0f1115]" id="center-main">
+            
+            <!-- VIEW 1: MONACO CODE EDITOR -->
+            <div class="flex-1 flex flex-col min-h-0 relative" id="main-view-editor">
+                <!-- File Tabs Bar -->
+                <div class="bg-[#12151c] flex items-center border-b border-[#242936] overflow-x-auto text-xs" id="editor-tabs-container"></div>
+
+                <!-- Monaco Editor Container -->
+                <div class="flex-1 relative w-full h-full min-h-0">
+                    <div id="monaco-root"></div>
+                </div>
+            </div>
+
+            <!-- VIEW 2: STD.BUILD DAG VISUALIZER -->
+            <div class="flex-1 flex-col min-h-0 relative p-4 overflow-y-auto hidden" id="main-view-dag">
+                <div class="flex items-center justify-between pb-3 border-b border-[#242936] mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-white flex items-center space-x-2">
+                            <span>std.Build Directed Acyclic Graph (DAG)</span>
+                            <span class="text-xs text-[#f7a41d] bg-[#f7a41d]/10 px-2 py-0.5 rounded font-mono border border-[#f7a41d]/20">v0.2 Engine</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Interactive step dependency graph compiled from <span class="text-slate-200 font-mono">build.zig</span>. Click any node to inspect parameters.</p>
+                    </div>
+                    <button onclick="switchMainView('editor')" class="px-3 py-1 bg-[#1a1f2c] hover:bg-[#252b3d] text-xs font-mono rounded border border-[#242936] text-slate-300">
+                        Back to Editor
+                    </button>
+                </div>
+
+                <!-- DAG Canvas SVG Container -->
+                <div class="bg-[#0b0d13] border border-[#242936] rounded-xl p-4 mb-4 shadow-inner" id="dag-canvas-container"></div>
+
+                <!-- Selected Node Inspector Card -->
+                <div id="dag-node-inspector"></div>
+            </div>
+
+            <!-- VIEW 3: COMPILER EXPLORER (ZIR & ASSEMBLY SIDE-BY-SIDE) -->
+            <div class="flex-1 flex-col min-h-0 relative p-3 overflow-hidden hidden" id="main-view-zir">
+                <div class="flex items-center justify-between pb-2 border-b border-[#242936] mb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-bold text-white">Compiler Explorer</span>
+                        <span class="text-xs text-cyan-400 font-mono" id="compiler-active-file">[src/main.zig]</span>
+                    </div>
+                    <button onclick="switchMainView('editor')" class="px-2.5 py-0.5 bg-[#1a1f2c] text-xs font-mono rounded border border-[#242936] text-slate-300">
+                        Close
+                    </button>
+                </div>
+
+                <!-- Split Columns for ZIR and ASM -->
+                <div class="flex-1 grid grid-cols-2 gap-3 min-h-0 overflow-hidden">
+                    <!-- Left: ZIR Dump -->
+                    <div class="flex flex-col bg-[#0b0d13] rounded-lg border border-[#242936] overflow-hidden">
+                        <div class="bg-[#12151c] px-3 py-1.5 border-b border-[#242936] text-xs font-mono text-[#f7a41d] font-bold flex justify-between">
+                            <span>Zig Intermediate Representation (ZIR)</span>
+                            <span class="text-slate-500 font-normal">Semantic AST Pass</span>
+                        </div>
+                        <pre class="flex-1 p-3 overflow-y-auto text-cyan-300 font-mono text-xs leading-relaxed selection:bg-[#f7a41d]/30" id="zir-content-panel"></pre>
+                    </div>
+
+                    <!-- Right: Native Assembly -->
+                    <div class="flex flex-col bg-[#0b0d13] rounded-lg border border-[#242936] overflow-hidden">
+                        <div class="bg-[#12151c] px-3 py-1.5 border-b border-[#242936] text-xs font-mono text-emerald-400 font-bold flex justify-between">
+                            <span>Machine Assembly (<span id="asm-target-label">x86_64-linux-gnu</span>)</span>
+                            <span class="text-slate-500 font-normal">Vectorized Codegen</span>
+                        </div>
+                        <pre class="flex-1 p-3 overflow-y-auto text-emerald-300 font-mono text-xs leading-relaxed selection:bg-[#f7a41d]/30" id="asm-content-panel"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESIZER BOTTOM (VERTICAL DRAG FOR TERMINAL) -->
+            <div id="resizer-bottom" class="resizer-v" title="Drag to resize terminal panel"></div>
+
+            <!-- LOWER INTEGRATED TERMINAL & BUILD OUTPUT PANEL -->
+            <div id="terminal-panel" class="h-56 bg-[#0a0c10] flex flex-col flex-shrink-0 relative overflow-hidden transition-[height] duration-75">
+                <div class="bg-[#12151c] px-4 py-1.5 flex items-center justify-between border-b border-[#242936]">
+                    <div class="flex items-center space-x-4 text-xs font-medium">
+                        <button onclick="switchTerminalTab('console')" id="tab-btn-console" class="text-white border-b-2 border-[#f7a41d] pb-0.5 font-semibold">Build Outputs</button>
+                        <button onclick="switchTerminalTab('tests')" id="tab-btn-tests" class="text-slate-400 hover:text-slate-200 pb-0.5 flex items-center space-x-1.5">
+                            <span>Test Suites</span>
+                            <span id="test-badge-count" class="bg-emerald-500/20 text-emerald-400 font-mono text-[10px] px-1.5 py-0.2 rounded-full border border-emerald-500/30">4 OK</span>
+                        </button>
+                        <button onclick="switchTerminalTab('asm')" id="tab-btn-asm" class="text-slate-400 hover:text-slate-200 pb-0.5 flex items-center space-x-1">
+                            <span>Disassembly (ASM)</span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button onclick="maximizeTerminalPanel()" id="btn-term-max" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded bg-[#161a24] border border-[#242936] transition" title="Maximize/Restore Terminal">
+                            ⤢ Max
+                        </button>
+                        <button onclick="toggleTerminalPanel()" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded bg-[#161a24] border border-[#242936] transition" title="Minimize/Expand Terminal">
+                            ▾ Min
+                        </button>
+                        <button onclick="clearTerminalView()" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-0.5 rounded bg-[#161a24] border border-[#242936] transition">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Terminal Viewport -->
+                <div class="flex-1 p-3 overflow-y-auto code-font text-xs text-slate-300" id="terminal-viewport">
+                    <div id="panel-console" class="space-y-1"></div>
+                    <div id="panel-tests" class="space-y-1 hidden"></div>
+                    <div id="panel-asm" class="space-y-1 hidden"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RESIZER RIGHT (HORIZONTAL DRAG) -->
+        <div id="resizer-right" class="resizer-h" title="Drag to resize inspector tools"></div>
+
+        <!-- RIGHT SIDEBAR: MEMORY PROFILER, CANARY SANDBOX & COMPTIME -->
+        <aside id="right-sidebar" class="w-80 bg-[#11141b] flex flex-col flex-shrink-0 relative overflow-y-auto transition-[width] duration-75">
+            
+            <!-- SECTION 1: MEMORY TRACER & DYNAMIC TIMELINE PROFILER -->
+            <div class="p-3 border-b border-[#242936]">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+                        <span>🔍 Heap Inspector Tracer</span>
+                    </span>
+                    <div class="flex items-center space-x-1.5">
+                        <span id="tracer-status-badge" class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono">
+                            ✔ No Leaks
+                        </span>
+                        <button onclick="toggleRightSidebar()" class="text-slate-500 hover:text-slate-300 text-xs px-1" title="Collapse Inspector">
+                            ▶
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 32-Cell Interactive Heap Grid -->
+                <div class="grid grid-cols-8 gap-1.5 p-2 bg-[#090b0f] rounded-lg border border-[#242936] mb-2" id="heap-grid-container"></div>
+
+                <!-- Legend -->
+                <div class="flex items-center justify-between text-[10px] text-slate-400 px-1 font-mono mb-2.5" id="heap-legend-container"></div>
+
+                <!-- Dynamic Allocation Timeline Canvas -->
+                <div class="mb-2">
+                    <div class="flex items-center justify-between text-[10px] text-slate-400 font-mono mb-1">
+                        <span>Heap Allocation Timeline</span>
+                        <span id="memory-canary-badge" class="text-emerald-400 font-semibold">✔ Canaries Intact</span>
+                    </div>
+                    <div class="bg-[#090b0f] p-1 rounded border border-[#242936]">
+                        <canvas id="profiler-canvas" width="280" height="42" class="w-full h-10 block"></canvas>
+                    </div>
+                </div>
+
+                <!-- Controls: Leak Simulation & Canary Overrun Sandbox -->
+                <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+                    <button onclick="simulateLeak()" class="px-2 py-1 bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-500/40 rounded text-[10px] font-mono font-medium transition active:scale-95 text-center">
+                        ⚠ Simulate Leak
+                    </button>
+                    <button onclick="simulateCanaryOverrun()" class="px-2 py-1 bg-orange-950/40 hover:bg-orange-900/60 text-orange-300 border border-orange-500/40 rounded text-[10px] font-mono font-medium transition active:scale-95 text-center">
+                        🚨 Buffer Overrun
+                    </button>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                    <button onclick="allocateChunk()" class="px-1.5 py-1 bg-[#4ea8de]/10 hover:bg-[#4ea8de]/20 text-[#4ea8de] border border-[#4ea8de]/30 rounded text-[10px] font-mono transition text-center">
+                        +16B Alloc
+                    </button>
+                    <button onclick="freeChunk()" class="px-1.5 py-1 bg-[#161a24] hover:bg-[#202534] text-slate-400 border border-[#242936] rounded text-[10px] font-mono transition text-center">
+                        -16B Free
+                    </button>
+                    <button onclick="resetHeap()" class="px-1.5 py-1 bg-[#1a1f2c] hover:bg-[#252b3d] text-slate-300 border border-[#374151] rounded text-[10px] font-mono transition text-center">
+                        ↺ Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- SECTION 2: COMPTIME MONOMORPHIZATION & REFLECTION -->
+            <div class="p-3 border-b border-[#242936] bg-[#0c0e13]">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
+                        <span>⚡ Comptime Reflection</span>
+                    </span>
+                    <span class="text-[#f7a41d] font-mono text-[10px]">Zero Runtime Cost</span>
+                </div>
+                <div class="space-y-2" id="monomorph-deck-container"></div>
+            </div>
+
+            <!-- SECTION 3: REACTIVE ABSTRACT SYNTAX TREE (AST) -->
+            <div class="p-3 flex-1 flex flex-col">
+                <div class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span>🌳 Active AST Inspector</span>
+                    <span id="ast-active-label" class="text-slate-500 font-mono text-[10px]">src/main.zig</span>
+                </div>
+                <div class="flex-1 bg-[#090b0f] rounded-lg border border-[#242936] p-2.5 overflow-y-auto space-y-1" id="ast-tree-container"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- IDE CONTROL STATUS FOOTER -->
+    <footer class="bg-[#0e1117] border-t border-[#242936] px-4 py-1.5 flex items-center justify-between text-xs text-slate-400 z-30">
+        <div class="flex items-center space-x-4">
+            <span class="flex items-center space-x-1.5" id="footer-zls-status">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <span class="text-slate-300 font-medium">ZLS In-Browser Engine Ready</span>
+            </span>
+            <span class="text-slate-600">|</span>
+            <span>Target: <span id="footer-target-triple" class="font-mono text-[#f7a41d]">x86_64-linux-gnu</span></span>
+            <span class="text-slate-600">|</span>
+            <span>Mode: <span id="footer-build-mode" class="font-mono text-slate-200">Debug</span></span>
+        </div>
+
+        <div class="flex items-center space-x-4 text-[11px] font-mono">
+            <span>Ln <span id="footer-cursor-line" class="text-slate-200">1</span>, Col <span id="footer-cursor-col" class="text-slate-200">1</span></span>
+            <span class="text-slate-600">|</span>
+            <span>Lines: <span id="footer-total-lines" class="text-slate-200">46</span></span>
+            <span class="text-slate-600">|</span>
+            <span>UTF-8</span>
+            <span class="text-slate-600">|</span>
+            <span>Spaces: 4</span>
+            <span class="bg-[#f7a41d]/10 text-[#f7a41d] px-1.5 py-0.5 rounded border border-[#f7a41d]/20">Zig 0.13.0</span>
+        </div>
+    </footer>
+
+    <!-- REAL DUAL-MODE ZLS PROTOCOL MODAL -->
+    <div id="zls-modal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-[#11141b] border border-[#242936] rounded-xl w-[600px] shadow-2xl p-5 font-mono">
+            <div class="flex items-center justify-between pb-2.5 border-b border-[#242936] mb-4">
+                <span class="font-bold text-white text-sm flex items-center space-x-2">
+                    <span class="text-[#f7a41d]">⚡</span>
+                    <span>ZLS Language Server Protocol Bridge</span>
+                </span>
+                <button onclick="toggleZlsModal()" class="text-slate-400 hover:text-white text-lg">&times;</button>
+            </div>
+            
+            <div class="space-y-4 text-xs">
+                <div>
+                    <label class="text-slate-400 block mb-1.5 font-sans font-medium text-xs">Select LSP Bridge Connection Mode:</label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="switchZlsMode('mock')" id="zls-mode-mock-btn" class="p-3 bg-[#f7a41d]/15 border-2 border-[#f7a41d] rounded-lg text-left transition">
+                            <div class="text-[#f7a41d] font-bold flex items-center space-x-1.5">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                <span>In-Browser Mock Engine</span>
+                            </div>
+                            <span class="block text-[10px] text-slate-400 font-normal mt-1 leading-snug">Zero setup; instant AST tokenization & comptime inspection</span>
+                        </button>
+                        <button onclick="switchZlsMode('ws')" id="zls-mode-ws-btn" class="p-3 bg-[#161a24] border-2 border-[#242936] rounded-lg text-left hover:border-slate-500 transition">
+                            <div class="text-slate-200 font-bold flex items-center space-x-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                <span>Native WebSocket Daemon</span>
+                            </div>
+                            <span class="block text-[10px] text-slate-400 font-normal mt-1 leading-snug">Live bi-directional JSON-RPC over ws://</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="zls-url-container" class="bg-[#090b0f] p-2.5 rounded-lg border border-[#242936] flex items-center justify-between">
+                    <div class="flex items-center space-x-2 flex-1">
+                        <span class="text-slate-400 text-xs">WebSocket Endpoint:</span>
+                        <input type="text" id="zls-ws-url-input" value="ws://localhost:9999" class="bg-[#151923] border border-[#242936] rounded px-2 py-1 text-xs text-emerald-400 font-mono flex-1 focus:outline-none focus:border-[#f7a41d]">
+                    </div>
+                    <button onclick="reconnectWebSocket()" class="ml-2 px-2.5 py-1 bg-[#f7a41d] text-[#090b0f] font-bold rounded text-xs hover:bg-amber-400">
+                        Connect
+                    </button>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-slate-400 uppercase text-[10px] tracking-wider font-bold">Live JSON-RPC 2.0 Traffic Stream:</span>
+                        <button onclick="clearZlsLogs()" class="text-[10px] text-slate-500 hover:text-slate-300">Clear Trace</button>
+                    </div>
+                    <div class="bg-[#090b0f] border border-[#242936] rounded-lg p-2.5 h-44 overflow-y-auto space-y-1.5 text-[11px]" id="zls-traffic-log"></div>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-[#242936] flex justify-between items-center text-xs">
+                <span id="zls-active-state-desc" class="text-slate-400 font-mono text-[11px]">Mode: In-Browser Mock Simulator Active</span>
+                <button onclick="toggleZlsModal()" class="px-4 py-1.5 bg-[#1a1f2c] text-white rounded-md border border-[#242936] hover:bg-[#262c3e]">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MONACO LOADER & APPLICATION LOGIC -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+
+    <script>
+        // Global State & Datastores
+        let editorInstance = null;
+        let monacoModels = {};
+        let activeFileKey = "src/main.zig";
+        let activeBuildMode = "Debug";
+        let activeTargetTriple = "x86_64-linux-gnu";
+        let activeAllocator = "gpa";
+        let isSimulatingLeak = false;
+        let isCanaryCorrupted = false;
+        let currentMainView = "editor";
+        let activeSidebarTab = "files";
+        let terminalActiveTab = "console";
+        let isRunningPipeline = false;
+        let profilerHistory = [16, 32, 64, 64, 80, 64, 48, 64, 112, 64];
+
+        // Panel Resizing State
+        let isLeftCollapsed = false;
+        let isRightCollapsed = false;
+        let isTerminalCollapsed = false;
+        let isTerminalMaximized = false;
+        let savedLeftWidth = 256;
+        let savedRightWidth = 320;
+        let savedTerminalHeight = 224;
+
+        // ZLS Bridge WebSocket State
+        let activeZlsMode = 'mock'; // 'mock' | 'ws'
+        let zlsWebSocket = null;
+        let zlsLogs = [];
+
+        // Target Triples Matrix
+        const targetTriplesConfig = {
+            "x86_64-linux-gnu": { arch: "x86_64", ptrWidth: "64-bit", sizeDebug: "142 KB", sizeReleaseSmall: "22 KB" },
+            "x86_64-windows-gnu": { arch: "x86_64", ptrWidth: "64-bit", sizeDebug: "168 KB", sizeReleaseSmall: "28 KB" },
+            "aarch64-macos.none": { arch: "aarch64", ptrWidth: "64-bit", sizeDebug: "154 KB", sizeReleaseSmall: "24 KB" },
+            "riscv64-linux-musl": { arch: "riscv64", ptrWidth: "64-bit", sizeDebug: "112 KB", sizeReleaseSmall: "18 KB" },
+            "wasm32-freestanding": { arch: "wasm32", ptrWidth: "32-bit", sizeDebug: "64 KB", sizeReleaseSmall: "11 KB" }
+        };
+
+        // Project Files Database
+        const projectFiles = {
+            "src/main.zig": {
+                name: "main.zig",
+                category: "src",
+                icon: "⚡",
+                ast: [
+                    { type: "Root", label: "src/main.zig", children: [
+                        { type: "Import", label: "const std = @import(\"std\");" },
+                        { type: "Import", label: "const tracker = @import(\"tracker.zig\");" },
+                        { type: "Import", label: "const fast_c = @import(\"fast_c.zig\");" },
+                        { type: "FnDeclaration", label: "pub fn main() !void", children: [
+                            { type: "VarDecl", label: "var gpa = std.heap.GeneralPurposeAllocator(.{}){}" },
+                            { type: "DeferStatement", label: "defer _ = gpa.deinit()" },
+                            { type: "VarDecl", label: "const allocator = gpa.allocator()" },
+                            { type: "CallExpression", label: "const matrix = try tracker.initMatrix(allocator, 4, 4)" },
+                            { type: "DeferStatement", label: "defer tracker.freeMatrix(allocator, matrix)" }
+                        ]},
+                        { type: "TestDeclaration", label: "test \"comptime matrix shape validator\"" },
+                        { type: "TestDeclaration", label: "test \"comptime generic matrix alignment\"" }
+                    ]}
+                ],
+                code: `const std = @import("std");
+const tracker = @import("tracker.zig");
+const fast_c = @import("fast_c.zig");
+
+pub fn main() !void {
+    // 1. Explicit allocator setup — no hidden allocations in Zig
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) {
+            std.debug.print("CRITICAL: Memory leak detected in GPA!\\n", .{});
+        }
+    }
+    const allocator = gpa.allocator();
+
+    std.debug.print("== Zig Studio v0.2 Runtime Initialized ==\\n", .{});
+
+    // 2. Comptime-validated generic matrix computation
+    const matrix = try tracker.initMatrix(allocator, 4, 4);
+    defer tracker.freeMatrix(allocator, matrix);
+
+    std.debug.print("Allocated 4x4 matrix on explicit GPA heap.\\n", .{});
+
+    // 3. Zero-cost C ABI socket demonstration (Jarred Sumner style)
+    var server = try fast_c.FastNonBlockingServer.init(8080);
+    defer server.deinit();
+
+    std.debug.print("Bound non-blocking socket (fd={d}) via zero-cost C ABI.\\n", .{server.server_fd});
+    std.debug.print("Pipeline executed with zero leaks and optimal memory layout.\\n", .{});
+}
+
+test "comptime matrix shape validator" {
+    const verified = @comptime tracker.validateShape(4, 4);
+    try std.testing.expect(verified);
+}
+
+test "comptime generic matrix alignment" {
+    const Mat4x4 = tracker.Matrix(4, 4, f32);
+    try std.testing.expectEqual(@sizeOf(Mat4x4), 64);
+    try std.testing.expectEqual(@alignOf(Mat4x4), 16);
+}
+`
+            },
+            "src/tracker.zig": {
+                name: "tracker.zig",
+                category: "src",
+                icon: "⚡",
+                ast: [
+                    { type: "Root", label: "src/tracker.zig", children: [
+                        { type: "Import", label: "const std = @import(\"std\");" },
+                        { type: "FnDeclaration", label: "pub fn Matrix(rows, cols, T) type" },
+                        { type: "FnDeclaration", label: "pub fn initMatrix(allocator, rows, cols) ![][]f32" },
+                        { type: "FnDeclaration", label: "pub fn freeMatrix(allocator, matrix) void" },
+                        { type: "FnDeclaration", label: "pub fn validateShape(r, c) bool" }
+                    ]}
+                ],
+                code: `const std = @import("std");
+
+/// Generic compile-time monomorphized matrix structure
+pub fn Matrix(comptime rows: usize, comptime cols: usize, comptime T: type) type {
+    return struct {
+        const Self = @This();
+        data: [rows * cols]T align(16),
+
+        pub fn identity() Self {
+            var m: Self = undefined;
+            @memset(&m.data, 0);
+            comptime var i: usize = 0;
+            inline while (i < @min(rows, cols)) : (i += 1) {
+                m.data[i * cols + i] = 1.0;
+            }
+            return m;
+        }
+    };
+}
+
+pub fn initMatrix(allocator: std.mem.Allocator, rows: usize, cols: usize) ![][]f32 {
+    const data = try allocator.alloc([]f32, rows);
+    errdefer allocator.free(data);
+
+    for (data, 0..) |*row, i| {
+        row.* = try allocator.alloc(f32, cols);
+        @memset(row.*, 0.0);
+        errdefer {
+            for (data[0..i]) |allocated_row| allocator.free(allocated_row);
+        }
+    }
+    return data;
+}
+
+pub fn freeMatrix(allocator: std.mem.Allocator, matrix: [][]f32) void {
+    for (matrix) |row| allocator.free(row);
+    allocator.free(matrix);
+}
+
+pub fn validateShape(r: usize, c: usize) bool {
+    return r == c;
+}
+`
+            },
+            "src/fast_c.zig": {
+                name: "fast_c.zig",
+                category: "src",
+                icon: "⚡",
+                ast: [
+                    { type: "Root", label: "src/fast_c.zig", children: [
+                        { type: "TypeDecl", label: "pub const SockAddrIn = extern struct" },
+                        { type: "ExternFn", label: "extern \"c\" fn socket(...) callconv(.c) fd_t" },
+                        { type: "StructDecl", label: "pub const FastNonBlockingServer = struct" }
+                    ]}
+                ],
+                code: `// Jarred Sumner Style: Zero-Cost C ABI Interop with System APIs
+const std = @import("std");
+
+pub const fd_t = c_int;
+pub const socklen_t = u32;
+
+pub const SockAddrIn = extern struct {
+    sin_family: u16,
+    sin_port: u16,
+    sin_addr: u32,
+    sin_zero: [8]u8 = [_]u8{0} ** 8,
+
+    comptime {
+        std.debug.assert(@sizeOf(SockAddrIn) == 16);
+    }
+};
+
+pub const AF_INET: u16 = 2;
+pub const SOCK_STREAM: c_int = 1;
+pub const SOCK_NONBLOCK: c_int = 0o0004000;
+pub const SOCK_CLOEXEC: c_int = 0o2000000;
+
+extern "c" fn socket(domain: c_int, type_flags: c_int, protocol: c_int) callconv(.c) fd_t;
+extern "c" fn bind(sockfd: fd_t, addr: ?*const anyopaque, addrlen: socklen_t) callconv(.c) c_int;
+extern "c" fn listen(sockfd: fd_t, backlog: c_int) callconv(.c) c_int;
+extern "c" fn close(fd: fd_t) callconv(.c) c_int;
+
+pub const FastNonBlockingServer = struct {
+    server_fd: fd_t,
+
+    pub fn init(port: u16) !FastNonBlockingServer {
+        const s_fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0);
+        if (s_fd < 0) return error.SystemError;
+        errdefer _ = close(s_fd);
+
+        const addr = SockAddrIn{
+            .sin_family = AF_INET,
+            .sin_port = std.mem.nativeToBig(u16, port),
+            .sin_addr = 0,
+        };
+
+        if (bind(s_fd, @ptrCast(&addr), @sizeOf(SockAddrIn)) != 0) return error.AddressInUse;
+        if (listen(s_fd, 4096) != 0) return error.SystemError;
+
+        return FastNonBlockingServer{ .server_fd = s_fd };
+    }
+
+    pub fn deinit(self: *FastNonBlockingServer) void {
+        _ = close(self.server_fd);
+        self.* = undefined;
+    }
+};
+`
+            },
+            "build.zig": {
+                name: "build.zig",
+                category: "root",
+                icon: "⚙️",
+                ast: [
+                    { type: "Root", label: "build.zig", children: [
+                        { type: "FnDeclaration", label: "pub fn build(b: *std.Build) void" }
+                    ]}
+                ],
+                code: `const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const exe = b.addExecutable(.{
+        .name = "zig_studio_app",
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    b.installArtifact(exe);
+
+    const run_cmd = b.addRunArtifact(exe);
+    run_cmd.step.dependOn(b.getInstallStep());
+    const run_step = b.step("run", "Run application");
+    run_step.dependOn(&run_cmd.step);
+
+    const exe_tests = b.addTest(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    const test_step = b.step("test", "Run tests");
+    test_step.dependOn(&b.addRunArtifact(exe_tests).step);
+}
+`
+            },
+            "build.zig.zon": {
+                name: "build.zig.zon",
+                category: "root",
+                icon: "📦",
+                ast: [
+                    { type: "Root", label: "build.zig.zon" }
+                ],
+                code: `.{
+    .name = "zig_studio_app",
+    .version = "0.2.0",
+    .minimum_zig_version = "0.13.0",
+    .dependencies = .{
+        .network = .{
+            .url = "https://github.com/MasterQ32/zig-network/archive/refs/tags/v0.1.0.tar.gz",
+            .hash = "12209b5311ad786e42b8e3a24172f3d537f2a1bb18a7d656094b92b6a22f483786a1",
+        },
+        .vaxis = .{
+            .url = "https://github.com/rockorager/libvaxis/archive/v0.3.0.tar.gz",
+            .hash = "122081d58ec2d8cf4b3b1e7f62b70f058ab39841fef67dc2b3780598b9596397261a",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
+`
+            }
+        };
+
+        // Initialize Monaco Editor with Multi-Model Architecture
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' } });
+
+        require(['vs/editor/editor.main'], function () {
+            registerMonacoZig();
+            registerComptimeHover();
+
+            // Create individual ITextModel for each file to preserve cursor and undo history
+            Object.keys(projectFiles).forEach(key => {
+                monacoModels[key] = monaco.editor.createModel(
+                    projectFiles[key].code,
+                    'zig',
+                    monaco.Uri.parse(`inmemory:///${key}`)
+                );
+            });
+
+            editorInstance = monaco.editor.create(document.getElementById('monaco-root'), {
+                model: monacoModels[activeFileKey],
+                theme: 'zig-studio-dark',
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', monospace",
+                lineNumbers: 'on',
+                roundedSelection: true,
+                scrollBeyondLastLine: false,
+                tabSize: 4,
+                insertSpaces: true,
+                automaticLayout: true,
+                minimap: { enabled: true, side: 'right' }
+            });
+
+            editorInstance.onDidChangeCursorPosition(e => {
+                document.getElementById('footer-cursor-line').innerText = e.position.lineNumber;
+                document.getElementById('footer-cursor-col').innerText = e.position.column;
+            });
+
+            editorInstance.onDidChangeModelContent(() => {
+                updateFooterStats();
+            });
+
+            // Initial UI Renders
+            renderFileTree();
+            renderEditorTabs();
+            renderHeapGrid();
+            renderMonomorphizationCards();
+            renderASTTree();
+            renderDagGraph();
+            renderZirViewer();
+            renderZonPackages();
+            drawProfilerTimeline();
+            initTerminalLogs();
+            updateTargetTelemetry();
+            updateFooterStats();
+
+            // Setup Resizable Splitters
+            setupPanelResizers();
+
+            // Initialize ZLS mock logs
+            logZlsMessage("INFO", "ZLS In-Browser Comptime VM initialized.");
+            logZlsMessage("OUT", "initialize:result", { capabilities: { hoverProvider: true, definitionProvider: true } });
+        });
+
+        // Monaco Syntax & Theme
+        function registerMonacoZig() {
+            monaco.languages.register({ id: 'zig' });
+            monaco.languages.setMonarchTokensProvider('zig', {
+                defaultToken: '',
+                tokenPostfix: '.zig',
+                keywords: ['comptime', 'const', 'var', 'fn', 'pub', 'defer', 'errdefer', 'try', 'catch', 'test', 'struct', 'extern', 'packed', 'return', 'for', 'while', 'if', 'else'],
+                typeKeywords: ['u8', 'u16', 'u32', 'u64', 'usize', 'i32', 'f32', 'f64', 'bool', 'void', 'anyerror', 'c_int', 'type'],
+                tokenizer: {
+                    root: [
+                        [/[a-zA-Z_]\w*/, { cases: { '@keywords': 'keyword', '@typeKeywords': 'type', '@default': 'identifier' } }],
+                        [/@[a-zA-Z_]\w*/, 'keyword.builtin'],
+                        [/\/\/\/.*$/, 'comment.doc'],
+                        [/\/\/.*$/, 'comment'],
+                        [/[{}()\[\]]/, '@brackets'],
+                        [/0x[0-9a-fA-F_]+/, 'number.hex'],
+                        [/\d+\.\d+/, 'number.float'],
+                        [/\d+/, 'number'],
+                        [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                        [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }]
+                    ],
+                    string: [[/[^\\"]+/, 'string'], [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]]
+                }
+            });
+
+            monaco.editor.defineTheme('zig-studio-dark', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [
+                    { token: 'keyword', foreground: 'F7A41D', fontStyle: 'bold' },
+                    { token: 'keyword.builtin', foreground: 'E9C46A', fontStyle: 'bold' },
+                    { token: 'type', foreground: '4EA8DE' },
+                    { token: 'identifier', foreground: 'E2E8F0' },
+                    { token: 'string', foreground: '06D6A0' },
+                    { token: 'number', foreground: 'FF7096' },
+                    { token: 'comment', foreground: '64748B', fontStyle: 'italic' }
+                ],
+                colors: {
+                    'editor.background': '#0F1115',
+                    'editor.foreground': '#E2E8F0',
+                    'editor.lineHighlightBackground': '#141821',
+                    'editorCursor.foreground': '#F7A41D',
+                    'editorLineNumber.foreground': '#475569',
+                    'editorLineNumber.activeForeground': '#F7A41D',
+                    'editor.selectionBackground': '#F7A41D33'
+                }
+            });
+        }
+
+        function registerComptimeHover() {
+            monaco.languages.registerHoverProvider('zig', {
+                provideHover: (model, pos) => {
+                    const w = model.getWordAtPosition(pos);
+                    if (!w) return null;
+                    if (w.word === 'comptime' || w.word === '@comptime') {
+                        return { contents: [{ value: '**⚡ `@comptime` Inlined Static Evaluation**' }, { value: 'Executed at compile time in compiler VM. 0 runtime instructions, 0 heap allocations.' }] };
+                    }
+                    if (w.word === 'Matrix') {
+                        return { contents: [{ value: '**⚡ Generic Monomorphization: `Matrix(4, 4, f32)`**' }, { value: 'Generates 64-byte struct with AVX2 16-byte alignment. Zero dynamic indirection.' }] };
+                    }
+                    if (w.word === 'GeneralPurposeAllocator') {
+                        return { contents: [{ value: '**🔍 `std.heap.GeneralPurposeAllocator`**' }, { value: 'Features canary guards, thread safety, and leak detection on `.deinit()`.' }] };
+                    }
+                    if (w.word === 'SockAddrIn') {
+                        return { contents: [{ value: '**🚀 Zero-Cost C ABI System API Interop**' }, { value: 'Matches raw C `struct sockaddr_in` bit-for-bit without runtime wrapper.' }] };
+                    }
+                    return null;
+                }
+            });
+        }
+
+        // ====================================================================
+        // DRAGGABLE SPLITTERS & PANEL SIZING ENGINE
+        // ====================================================================
+        function setupPanelResizers() {
+            const leftSidebar = document.getElementById('left-sidebar');
+            const rightSidebar = document.getElementById('right-sidebar');
+            const terminalPanel = document.getElementById('terminal-panel');
+
+            const resizerLeft = document.getElementById('resizer-left');
+            const resizerRight = document.getElementById('resizer-right');
+            const resizerBottom = document.getElementById('resizer-bottom');
+            const body = document.getElementById('app-body');
+
+            // 1. Resizer Left (Horizontal Drag)
+            let isDraggingLeft = false;
+            resizerLeft.addEventListener('mousedown', (e) => {
+                isDraggingLeft = true;
+                resizerLeft.classList.add('resizing');
+                body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+
+            // 2. Resizer Right (Horizontal Drag)
+            let isDraggingRight = false;
+            resizerRight.addEventListener('mousedown', (e) => {
+                isDraggingRight = true;
+                resizerRight.classList.add('resizing');
+                body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+
+            // 3. Resizer Bottom (Vertical Drag for Terminal)
+            let isDraggingBottom = false;
+            resizerBottom.addEventListener('mousedown', (e) => {
+                isDraggingBottom = true;
+                resizerBottom.classList.add('resizing');
+                body.style.cursor = 'row-resize';
+                e.preventDefault();
+            });
+
+            // Global Mousemove & Mouseup
+            window.addEventListener('mousemove', (e) => {
+                if (isDraggingLeft) {
+                    const newWidth = Math.min(Math.max(160, e.clientX), 500);
+                    leftSidebar.style.width = `${newWidth}px`;
+                    savedLeftWidth = newWidth;
+                    isLeftCollapsed = false;
+                    layoutEditor();
+                } else if (isDraggingRight) {
+                    const newWidth = Math.min(Math.max(220, window.innerWidth - e.clientX), 560);
+                    rightSidebar.style.width = `${newWidth}px`;
+                    savedRightWidth = newWidth;
+                    isRightCollapsed = false;
+                    layoutEditor();
+                } else if (isDraggingBottom) {
+                    const centerMain = document.getElementById('center-main');
+                    const mainRect = centerMain.getBoundingClientRect();
+                    const newHeight = Math.min(Math.max(36, mainRect.bottom - e.clientY), mainRect.height - 100);
+                    terminalPanel.style.height = `${newHeight}px`;
+                    savedTerminalHeight = newHeight;
+                    isTerminalCollapsed = false;
+                    isTerminalMaximized = false;
+                    layoutEditor();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDraggingLeft || isDraggingRight || isDraggingBottom) {
+                    isDraggingLeft = false;
+                    isDraggingRight = false;
+                    isDraggingBottom = false;
+                    resizerLeft.classList.remove('resizing');
+                    resizerRight.classList.remove('resizing');
+                    resizerBottom.classList.remove('resizing');
+                    body.style.cursor = '';
+                    layoutEditor();
+                }
+            });
+        }
+
+        function layoutEditor() {
+            if (editorInstance) {
+                setTimeout(() => editorInstance.layout(), 10);
+            }
+        }
+
+        // Panel Toggle Actions (Collapse / Expand / Maximize)
+        function toggleLeftSidebar() {
+            const sidebar = document.getElementById('left-sidebar');
+            const btn = document.getElementById('toggle-btn-left');
+            if (isLeftCollapsed) {
+                sidebar.style.width = `${savedLeftWidth}px`;
+                isLeftCollapsed = false;
+                if (btn) btn.className = "px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono";
+            } else {
+                savedLeftWidth = parseInt(sidebar.style.width) || 256;
+                sidebar.style.width = "0px";
+                isLeftCollapsed = true;
+                if (btn) btn.className = "px-2 py-1 text-[#f7a41d] bg-[#f7a41d]/15 rounded transition text-xs font-mono";
+            }
+            layoutEditor();
+        }
+
+        function toggleRightSidebar() {
+            const sidebar = document.getElementById('right-sidebar');
+            const btn = document.getElementById('toggle-btn-right');
+            if (isRightCollapsed) {
+                sidebar.style.width = `${savedRightWidth}px`;
+                isRightCollapsed = false;
+                if (btn) btn.className = "px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono";
+            } else {
+                savedRightWidth = parseInt(sidebar.style.width) || 320;
+                sidebar.style.width = "0px";
+                isRightCollapsed = true;
+                if (btn) btn.className = "px-2 py-1 text-[#f7a41d] bg-[#f7a41d]/15 rounded transition text-xs font-mono";
+            }
+            layoutEditor();
+        }
+
+        function toggleTerminalPanel() {
+            const term = document.getElementById('terminal-panel');
+            const btn = document.getElementById('toggle-btn-term');
+            if (isTerminalCollapsed) {
+                term.style.height = `${savedTerminalHeight}px`;
+                isTerminalCollapsed = false;
+                isTerminalMaximized = false;
+                if (btn) btn.className = "px-2 py-1 text-slate-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono";
+            } else {
+                savedTerminalHeight = parseInt(term.style.height) || 224;
+                term.style.height = "36px"; // Keep titlebar visible
+                isTerminalCollapsed = true;
+                isTerminalMaximized = false;
+                if (btn) btn.className = "px-2 py-1 text-[#f7a41d] bg-[#f7a41d]/15 rounded transition text-xs font-mono";
+            }
+            layoutEditor();
+        }
+
+        function maximizeTerminalPanel() {
+            const term = document.getElementById('terminal-panel');
+            const btnMax = document.getElementById('btn-term-max');
+            const centerMain = document.getElementById('center-main');
+
+            if (isTerminalMaximized) {
+                term.style.height = `${savedTerminalHeight}px`;
+                isTerminalMaximized = false;
+                btnMax.innerText = "⤢ Max";
+            } else {
+                savedTerminalHeight = parseInt(term.style.height) || 224;
+                const fullHeight = centerMain.getBoundingClientRect().height - 50;
+                term.style.height = `${fullHeight}px`;
+                isTerminalMaximized = true;
+                isTerminalCollapsed = false;
+                btnMax.innerText = "⤡ Rest";
+            }
+            layoutEditor();
+        }
+
+        // View Switcher (Editor vs std.Build DAG vs Compiler Explorer)
+        function switchMainView(view) {
+            currentMainView = view;
+            ['editor', 'dag', 'zir'].forEach(v => {
+                const btn = document.getElementById(`view-btn-${v}`);
+                const panel = document.getElementById(`main-view-${v}`);
+                if (btn) {
+                    btn.className = v === view ? 
+                        "px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all text-[#f7a41d] bg-[#f7a41d]/15" : 
+                        "px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200";
+                }
+                if (panel) {
+                    if (v === view) panel.classList.remove('hidden');
+                    else panel.classList.add('hidden');
+                }
+            });
+
+            if (view === 'editor' && editorInstance) {
+                editorInstance.layout();
+            } else if (view === 'zir') {
+                updateZirAndAsm();
+            }
+        }
+
+        // Sidebar Navigation (Files vs ZON Packages)
+        function switchSidebarTab(tab) {
+            activeSidebarTab = tab;
+            const btnFiles = document.getElementById('side-tab-files');
+            const btnPkgs = document.getElementById('side-tab-packages');
+            const treeContainer = document.getElementById('file-tree-container');
+            const zonContainer = document.getElementById('zon-packages-container');
+
+            if (tab === 'files') {
+                btnFiles.className = "py-2 font-bold text-white bg-[#0f1115] border-b-2 border-[#f7a41d] flex items-center justify-center space-x-1";
+                btnPkgs.className = "py-2 font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center justify-center space-x-1";
+                treeContainer.classList.remove('hidden');
+                zonContainer.classList.add('hidden');
+            } else {
+                btnPkgs.className = "py-2 font-bold text-white bg-[#0f1115] border-b-2 border-[#f7a41d] flex items-center justify-center space-x-1";
+                btnFiles.className = "py-2 font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent flex items-center justify-center space-x-1";
+                zonContainer.classList.remove('hidden');
+                treeContainer.classList.add('hidden');
+            }
+        }
+
+        // Target Triple Selector
+        function onTargetTripleChange() {
+            activeTargetTriple = document.getElementById('target-triple-select').value;
+            updateTargetTelemetry();
+            updateZirAndAsm();
+
+            const panel = document.getElementById('panel-console');
+            switchTerminalTab('console');
+            panel.innerHTML += `
+                <div class="text-[11px] text-amber-400 font-mono pl-2 border-l-2 border-amber-400 my-1">
+                    [Cross-Compilation] Target triple switched to <strong>${activeTargetTriple}</strong>. Zero sysroot configuration required.
+                </div>
+            `;
+            document.getElementById('terminal-viewport').scrollTop = document.getElementById('terminal-viewport').scrollHeight;
+        }
+
+        function updateTargetTelemetry() {
+            const t = targetTriplesConfig[activeTargetTriple];
+            document.getElementById('target-ptr-width').innerText = t.ptrWidth;
+            document.getElementById('target-arch-name').innerText = t.arch;
+            document.getElementById('footer-target-triple').innerText = activeTargetTriple;
+            document.getElementById('asm-target-label').innerText = activeTargetTriple;
+            
+            const size = activeBuildMode === 'ReleaseSmall' ? t.sizeReleaseSmall : t.sizeDebug;
+            document.getElementById('telemetry-binary-size').innerText = size;
+        }
+
+        function setBuildMode(mode) {
+            activeBuildMode = mode;
+            ['Debug', 'ReleaseSafe', 'ReleaseFast', 'ReleaseSmall'].forEach(m => {
+                const btn = document.getElementById(`btn-mode-${m}`);
+                if (btn) {
+                    btn.className = m === mode ? 
+                        "px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-[#f7a41d] bg-[#f7a41d]/15" : 
+                        "px-2 py-1 rounded-md text-xs font-mono font-medium transition-all text-slate-400 hover:text-slate-200";
+                }
+            });
+            document.getElementById('telemetry-badge-mode').innerText = mode;
+            document.getElementById('footer-build-mode').innerText = mode;
+            updateTargetTelemetry();
+            updateZirAndAsm();
+        }
+
+        // File Tree & Tab Rendering
+        function renderFileTree() {
+            const container = document.getElementById('file-tree-container');
+            container.innerHTML = `
+                <div class="flex items-center space-x-1.5 text-slate-400 px-2 py-1 text-xs">
+                    <span class="text-amber-500">📁</span>
+                    <span class="font-semibold text-slate-300 font-mono">zig_studio_app</span>
+                </div>
+                <div class="pl-3 space-y-0.5" id="tree-src-group">
+                    <div class="flex items-center space-x-1 text-slate-500 px-2 py-0.5 text-xs font-mono">
+                        <span>📁</span>
+                        <span>src</span>
+                    </div>
+                    <div id="tree-files-src" class="pl-2 space-y-0.5"></div>
+                </div>
+                <div class="pt-2 border-t border-[#242936]/40 space-y-0.5" id="tree-files-root"></div>
+            `;
+
+            const srcContainer = document.getElementById('tree-files-src');
+            const rootContainer = document.getElementById('tree-files-root');
+
+            Object.keys(projectFiles).forEach(key => {
+                const file = projectFiles[key];
+                const isActive = key === activeFileKey;
+                const item = document.createElement('div');
+                item.onclick = () => selectFile(key);
+                item.className = isActive ? 
+                    "flex items-center justify-between group px-3 py-1.5 rounded-md cursor-pointer transition bg-[#f7a41d]/15 text-white border-l-2 border-[#f7a41d] font-mono text-xs" : 
+                    "flex items-center justify-between group px-3 py-1.5 rounded-md cursor-pointer transition text-slate-400 hover:bg-[#191d28] hover:text-slate-200 font-mono text-xs";
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="${isActive ? 'text-[#f7a41d]' : 'text-slate-500'}">${file.icon}</span>
+                        <span>${file.name}</span>
+                    </div>
+                    ${isActive ? '<span class="text-[9px] bg-[#f7a41d]/20 text-[#f7a41d] px-1 rounded">Active</span>' : ''}
+                `;
+
+                if (file.category === 'src') srcContainer.appendChild(item);
+                else rootContainer.appendChild(item);
+            });
+        }
+
+        function renderEditorTabs() {
+            const container = document.getElementById('editor-tabs-container');
+            container.innerHTML = '';
+
+            Object.keys(projectFiles).forEach(key => {
+                const file = projectFiles[key];
+                const isActive = key === activeFileKey;
+                const tab = document.createElement('div');
+                tab.onclick = () => selectFile(key);
+                tab.className = `px-3.5 py-2 flex items-center space-x-2 border-r border-[#242936] font-mono cursor-pointer transition text-xs select-none ${isActive ? 'tab-active' : 'tab-inactive'}`;
+                tab.innerHTML = `<span class="${isActive ? 'text-[#f7a41d]' : 'text-slate-500'}">${file.icon}</span><span>${file.name}</span>`;
+                container.appendChild(tab);
+            });
+        }
+
+        function selectFile(key) {
+            if (!monacoModels[key]) return;
+            activeFileKey = key;
+            
+            if (editorInstance) {
+                editorInstance.setModel(monacoModels[key]);
+            }
+            
+            renderFileTree();
+            renderEditorTabs();
+            renderASTTree();
+            updateFooterStats();
+            document.getElementById('ast-active-label').innerText = key;
+            document.getElementById('compiler-active-file').innerText = `[${key}]`;
+            updateZirAndAsm();
+
+            if (zlsWebSocket && zlsWebSocket.readyState === WebSocket.OPEN) {
+                zlsWebSocket.send(JSON.stringify({
+                    jsonrpc: "2.0",
+                    method: "textDocument/didOpen",
+                    params: { textDocument: { uri: `file:///${key}`, languageId: "zig", version: 1, text: monacoModels[key].getValue() } }
+                }));
+                logZlsMessage("OUT", "textDocument/didOpen", { uri: `file:///${key}` });
+            }
+        }
+
+        function updateFooterStats() {
+            if (!editorInstance || !editorInstance.getModel()) return;
+            document.getElementById('footer-total-lines').innerText = editorInstance.getModel().getLineCount();
+        }
+
+        // ZON Package Manager Viewer & Live Adder
+        function renderZonPackages() {
+            const container = document.getElementById('zon-packages-container');
+            container.innerHTML = `
+                <div class="bg-[#0f1115] border border-[#242936] rounded-lg p-2.5 mb-2 font-mono text-xs">
+                    <div class="flex items-center justify-between pb-1 border-b border-[#242936] mb-1.5">
+                        <span class="text-white font-bold">zig_studio_app</span>
+                        <span class="text-[9px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded">v0.2.0</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400">Min Zig Version: <span class="text-slate-200">0.13.0</span></div>
+                </div>
+
+                <div class="flex items-center justify-between text-[10px] text-slate-400 uppercase font-mono tracking-wider mb-1.5">
+                    <span>Dependencies</span>
+                    <button onclick="showAddPackageDialog()" class="text-[#f7a41d] font-semibold hover:underline">+ Add Pkg</button>
+                </div>
+
+                <!-- Add Package Drawer Form (toggleable) -->
+                <div id="add-pkg-drawer" class="bg-[#090b0f] border border-[#f7a41d]/40 rounded-lg p-2 mb-2 hidden font-mono text-xs space-y-1.5">
+                    <div class="text-[#f7a41d] font-bold text-[11px]">Add Zig Package via zig fetch:</div>
+                    <input type="text" id="new-pkg-name" placeholder="Package name (e.g. zgui)" class="w-full bg-[#151821] border border-[#242936] rounded px-1.5 py-1 text-xs text-white">
+                    <div class="flex space-x-1 pt-1">
+                        <button onclick="commitAddPackage()" class="flex-1 bg-[#f7a41d] text-black font-bold py-0.5 rounded text-[10px]">Fetch & Add</button>
+                        <button onclick="hideAddPackageDialog()" class="px-2 bg-[#1a1f2c] text-slate-400 py-0.5 rounded text-[10px]">Cancel</button>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5 font-mono text-xs" id="zon-dependencies-list">
+                    <div class="bg-[#0f1115] border border-[#242936] rounded-lg p-2 hover:border-[#f7a41d]/40 transition">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[#4ea8de] font-bold">.network</span>
+                            <span class="text-[9px] text-slate-400">v0.1.0</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 leading-snug">Cross-platform network sockets</div>
+                        <div class="text-[9px] text-slate-500 truncate bg-black/40 p-1 rounded mt-1">
+                            hash: <span class="text-emerald-400">12209b5311ad...</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#0f1115] border border-[#242936] rounded-lg p-2 hover:border-[#f7a41d]/40 transition">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[#4ea8de] font-bold">.vaxis</span>
+                            <span class="text-[9px] text-slate-400">v0.3.0</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 leading-snug">Modern terminal UI framework</div>
+                        <div class="text-[9px] text-slate-500 truncate bg-black/40 p-1 rounded mt-1">
+                            hash: <span class="text-emerald-400">122081d58ec2...</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showAddPackageDialog() {
+            document.getElementById('add-pkg-drawer').classList.remove('hidden');
+        }
+
+        function hideAddPackageDialog() {
+            document.getElementById('add-pkg-drawer').classList.add('hidden');
+        }
+
+        function commitAddPackage() {
+            const nameInput = document.getElementById('new-pkg-name');
+            const pkgName = nameInput.value.trim() || 'known-folders';
+            hideAddPackageDialog();
+
+            const fakeHash = '1220' + Math.random().toString(16).substring(2, 14) + Math.random().toString(16).substring(2, 14);
+
+            // 1. Update UI card list
+            const list = document.getElementById('zon-dependencies-list');
+            const card = document.createElement('div');
+            card.className = "bg-[#0f1115] border border-[#242936] rounded-lg p-2 hover:border-[#f7a41d]/40 transition";
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[#4ea8de] font-bold">.${pkgName}</span>
+                    <span class="text-[9px] text-slate-400">v0.1.0</span>
+                </div>
+                <div class="text-[10px] text-slate-400 leading-snug">Community fetched package</div>
+                <div class="text-[9px] text-slate-500 truncate bg-black/40 p-1 rounded mt-1">
+                    hash: <span class="text-emerald-400">${fakeHash.substring(0, 16)}...</span>
+                </div>
+            `;
+            list.prepend(card);
+
+            // 2. Append directly to build.zig.zon model in Monaco!
+            if (monacoModels['build.zig.zon']) {
+                const currentZon = monacoModels['build.zig.zon'].getValue();
+                const updatedZon = currentZon.replace('.dependencies = .{', `.dependencies = .{\n        .${pkgName} = .{\n            .url = "https://github.com/zig-community/${pkgName}/archive/refs/tags/v0.1.0.tar.gz",\n            .hash = "${fakeHash}",\n        },`);
+                monacoModels['build.zig.zon'].setValue(updatedZon);
+            }
+
+            // 3. Log to terminal
+            switchTerminalTab('console');
+            const panel = document.getElementById('panel-console');
+            panel.innerHTML += `
+                <div class="text-[11px] text-green-400 font-mono pl-2 border-l-2 border-green-400 my-1">
+                    [zig fetch] Successfully resolved package \`.${pkgName}\` -> multihash: ${fakeHash}<br/>
+                    Injected dependency block directly into <strong>build.zig.zon</strong> model.
+                </div>
+            `;
+            document.getElementById('terminal-viewport').scrollTop = document.getElementById('terminal-viewport').scrollHeight;
+        }
+
+        // std.Build Step DAG Visualizer (with pointer-events: all)
+        const dagSteps = [
+            { id: "target_opt", label: "Target & Optimize Options", category: "config", x: 40, y: 70, color: "#4ea8de", icon: "⚙️", details: "target = b.standardTargetOptions(.{})\noptimize = b.standardOptimizeOption(.{})" },
+            { id: "exe", label: "b.addExecutable(\"zig_studio_app\")", category: "compile", x: 280, y: 35, color: "#f7a41d", icon: "⚡", details: "root_source_file = b.path(\"src/main.zig\")\ntarget = target, optimize = optimize" },
+            { id: "install_artifact", label: "b.installArtifact(exe)", category: "install", x: 540, y: 35, color: "#06d6a0", icon: "📦", details: "Emits binary artifact into zig-out/bin/zig_studio_app" },
+            { id: "run_cmd", label: "b.addRunArtifact(exe)", category: "run", x: 780, y: 35, color: "#f3c68f", icon: "▶️", details: "Executes zig-out/bin binary with arguments forwarding" },
+            { id: "step_run", label: "b.step(\"run\", \"Run app\")", category: "step", x: 1000, y: 35, color: "#e9c46a", icon: "🚀", details: "Top-level command step invoked via `zig build run`" },
+            { id: "unit_tests", label: "b.addTest(\"src/main.zig\")", category: "compile", x: 280, y: 130, color: "#ff7096", icon: "🧪", details: "Unit test suite runner covering matrix and C ABI" },
+            { id: "step_test", label: "b.step(\"test\", \"Run tests\")", category: "step", x: 620, y: 130, color: "#e9c46a", icon: "🏁", details: "Top-level command step invoked via `zig build test`" }
+        ];
+
+        const dagEdges = [
+            { from: "target_opt", to: "exe" },
+            { from: "target_opt", to: "unit_tests" },
+            { from: "exe", to: "install_artifact" },
+            { from: "install_artifact", to: "run_cmd" },
+            { from: "run_cmd", to: "step_run" },
+            { from: "unit_tests", to: "step_test" }
+        ];
+
+        let selectedDagId = "exe";
+
+        function renderDagGraph() {
+            const container = document.getElementById('dag-canvas-container');
+            let svg = `
+                <svg class="w-full h-56" viewBox="0 0 1200 200" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <marker id="dag-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#4b5563" />
+                        </marker>
+                        <marker id="dag-arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#f7a41d" />
+                        </marker>
+                    </defs>
+            `;
+
+            dagEdges.forEach(e => {
+                const n1 = dagSteps.find(s => s.id === e.from);
+                const n2 = dagSteps.find(s => s.id === e.to);
+                const isConn = selectedDagId === e.from || selectedDagId === e.to;
+                svg += `
+                    <path d="M ${n1.x + 190} ${n1.y + 22} C ${(n1.x + n2.x) / 2 + 50} ${n1.y + 22}, ${(n1.x + n2.x) / 2 + 50} ${n2.y + 22}, ${n2.x} ${n2.y + 22}"
+                          stroke="${isConn ? '#f7a41d' : '#374151'}" stroke-width="${isConn ? '2.5' : '1.5'}" fill="none"
+                          marker-end="${isConn ? 'url(#dag-arrow-active)' : 'url(#dag-arrow)'}" />
+                `;
+            });
+
+            dagSteps.forEach(s => {
+                const isSel = selectedDagId === s.id;
+                svg += `
+                    <g class="dag-node" onclick="selectDagStep('${s.id}')" transform="translate(${s.x}, ${s.y})">
+                        <rect width="190" height="44" rx="8" ry="8" fill="${isSel ? '#1e2433' : '#12151c'}" stroke="${isSel ? '#f7a41d' : '#242936'}" stroke-width="${isSel ? '2' : '1'}" />
+                        <rect width="4" height="30" x="7" y="7" rx="2" fill="${s.color}" />
+                        <text x="18" y="22" fill="#ffffff" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="bold">${s.icon} ${s.label.length > 20 ? s.label.substring(0, 18) + '...' : s.label}</text>
+                        <text x="18" y="35" fill="#94a3b8" font-family="'JetBrains Mono', monospace" font-size="9">[${s.category}]</text>
+                    </g>
+                `;
+            });
+
+            svg += `</svg>`;
+            container.innerHTML = svg;
+            renderDagInspector();
+        }
+
+        function selectDagStep(id) {
+            selectedDagId = id;
+            renderDagGraph();
+        }
+
+        function renderDagInspector() {
+            const node = dagSteps.find(s => s.id === selectedDagId);
+            const inspector = document.getElementById('dag-node-inspector');
+            if (!node || !inspector) return;
+
+            inspector.innerHTML = `
+                <div class="bg-[#0f1115] border border-[#242936] rounded-xl p-3.5 text-xs font-mono">
+                    <div class="flex items-center justify-between pb-2 border-b border-[#242936] mb-2">
+                        <span class="text-white font-bold text-sm flex items-center space-x-2">
+                            <span>${node.icon}</span>
+                            <span>${node.label}</span>
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded bg-[#f7a41d]/15 text-[#f7a41d] uppercase border border-[#f7a41d]/30">
+                            ${node.category} Step
+                        </span>
+                    </div>
+                    <div class="text-slate-400 text-[11px] mb-1">std.Build Step Configuration:</div>
+                    <pre class="bg-black/60 p-2.5 rounded-lg text-emerald-300 text-[11px] leading-relaxed mb-2">${node.details}</pre>
+                </div>
+            `;
+        }
+
+        // Compiler Explorer (ZIR & Machine Assembly)
+        function renderZirViewer() {
+            updateZirAndAsm();
+        }
+
+        function updateZirAndAsm() {
+            const zirPanel = document.getElementById('zir-content-panel');
+            const asmPanel = document.getElementById('asm-content-panel');
+            const termAsm = document.getElementById('panel-asm');
+
+            let zirCode = '';
+            let asmCode = '';
+
+            if (activeFileKey === 'src/tracker.zig') {
+                zirCode = `; ZIR (Zig Intermediate Representation) for [src/tracker.zig]
+; Target: ${activeTargetTriple} | Analysis: Monomorphization Pass
+
+%0 = import_symbol("std")
+
+; Generic Struct Constructor
+fn @Matrix(%rows: usize, %cols: usize, %T: type) type {
+  %1 = struct_decl({
+    .data: array_type(%rows * %cols, %T, .align = 16)
+  })
+  return %1
+}
+
+; Function: initMatrix
+fn @initMatrix(%allocator: Allocator, %rows: usize, %cols: usize) ![][]f32 {
+  %2 = call_method(%allocator, "alloc", [type([]f32), %rows])
+  return %2
+}`;
+                asmCode = `; Assembly Output for tracker.zig [${activeTargetTriple} / ${activeBuildMode}]
+initMatrix:
+    pushq   %rbx
+    movq    %rdi, %rbx
+    ; Inlined GPA allocation slot search
+    callq   std.mem.Allocator.alloc
+    testq   %rax, %rax
+    jz      .Lalloc_fail
+    popq    %rbx
+    ret`;
+            } else if (activeFileKey === 'src/fast_c.zig') {
+                zirCode = `; ZIR (Zig Intermediate Representation) for [src/fast_c.zig]
+; Zero-Cost C ABI Syscall Wrapper
+
+%0 = import_symbol("std")
+%1 = extern_fn("socket", [c_int, c_int, c_int], c_int, .callconv = .c)
+
+fn @FastNonBlockingServer.init(%port: u16) !FastNonBlockingServer {
+  ; Inline direct syscall emission (SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC)
+  %2 = call(%1, [2, 0x80800, 0])
+  %3 = cmp_lt(%2, 0)
+  cond_br %3, %error_block, %success_block
+  return %2
+}`;
+                asmCode = `; Direct Register Syscall Codegen [${activeTargetTriple}]
+FastNonBlockingServer.init:
+    movl    $526336, %esi         ; 0x80800
+    movl    $2, %edi              ; AF_INET
+    xorl    %edx, %edx            ; protocol = 0
+    jmp     socket@PLT            ; Tail-call eliminated register dispatch`;
+            } else {
+                zirCode = `; ZIR (Zig Intermediate Representation) for [src/main.zig]
+; Target: ${activeTargetTriple} | Self-Hosted Compiler Dump
+
+%0 = import_symbol("std")
+%1 = import_symbol("tracker.zig")
+%2 = import_symbol("fast_c.zig")
+
+fn @main() !void {
+  %3 = alloc_type(std.heap.GeneralPurposeAllocator(.{}))
+  %4 = struct_init(%3, .{})
+  %5 = defer_block {
+    %6 = call_method(%4, "deinit", [])
+    %7 = cmp_eq(%6, .leak)
+    cond_br %7, %leak_panic, %clean_exit
+  }
+  %8 = call_method(%4, "allocator", [])
+  %9 = comptime_call(@tracker.Matrix, [4, 4, f32])
+  %10 = call(@tracker.initMatrix, [%8, 4, 4])
+  %11 = inline_call(@fast_c.FastNonBlockingServer.init, [8080])
+  return void
+}`;
+                if (activeBuildMode === 'ReleaseSmall') {
+                    asmCode = `; Machine Instructions: ${activeTargetTriple} [ReleaseSmall (-Oz)]
+; Stripped Symbols | Ultra-Compact 22 KB Footprint
+
+.globl main
+main:
+    xorl    %edx, %edx
+    movl    $526336, %esi
+    pushq   $2
+    popq    %rdi
+    jmp     socket@PLT`;
+                } else if (activeBuildMode === 'ReleaseFast') {
+                    asmCode = `; Machine Instructions: ${activeTargetTriple} [ReleaseFast (-O3)]
+; Aggressive AVX2 Vectorization | Bounds Checks Stripped
+
+.globl main
+main:
+    subq    $40, %rsp
+    vpxor   %xmm0, %xmm0, %xmm0
+    vmovups %ymm0, (%rsp)
+    vmovups %ymm0, 32(%rsp)
+    movl    $526336, %esi
+    movl    $2, %edi
+    xorl    %edx, %edx
+    call    socket@PLT
+    addq    $40, %rsp
+    ret`;
+                } else {
+                    asmCode = `; Machine Instructions: ${activeTargetTriple} [Debug Mode]
+; Full Stack Frames & Bounds Panics Active
+
+.globl main
+main:
+    pushq   %rbp
+    movq    %rsp, %rbp
+    subq    $96, %rsp
+    leaq    -64(%rbp), %rdi
+    call    std.heap.GeneralPurposeAllocator.init
+    movl    $4, %eax
+    cmpl    $16, %eax
+    jae     zig_panic_bounds_check
+    movl    $526336, %esi
+    movl    $2, %edi
+    call    socket
+    leave
+    ret`;
+                }
+            }
+
+            if (zirPanel) zirPanel.innerText = zirCode;
+            if (asmPanel) asmPanel.innerText = asmCode;
+            if (termAsm) {
+                termAsm.innerHTML = `
+                    <div class="flex items-center justify-between pb-1.5 border-b border-[#242936] mb-2 text-xs font-mono">
+                        <span class="text-[#f7a41d] font-bold">Emitted Machine Assembly (${activeBuildMode} - ${activeTargetTriple})</span>
+                        <span class="text-slate-400 text-[11px]">Intel Syntax / Zero Trampoline Overhead</span>
+                    </div>
+                    <pre class="text-emerald-300 font-mono text-xs leading-relaxed overflow-x-auto whitespace-pre selection:bg-[#f7a41d]/30">${escapeHtml(asmCode)}</pre>
+                `;
+            }
+        }
+
+        // Heap Allocator Tracer & Dynamic Profiler Canvas
+        let heapBlocks = [];
+
+        function initHeapBlocks() {
+            heapBlocks = [];
+            const baseAddr = 0x7FFF0010;
+            for (let i = 0; i < 32; i++) {
+                const addr = (baseAddr + i * 16).toString(16).toUpperCase();
+                if (i === 0 || i === 1) heapBlocks.push({ type: 'metadata', label: 'GPA Header', size: '16B', addr, owner: 'gpa.meta' });
+                else if (i >= 2 && i <= 5) heapBlocks.push({ type: 'user', label: 'Matrix Row Data', size: '64B', addr, owner: 'tracker.initMatrix' });
+                else if (i >= 6 && i <= 7) heapBlocks.push({ type: 'canary', label: 'Guard Canary', size: '16B', addr, owner: 'gpa.canary' });
+                else if (i >= 8 && i <= 10) heapBlocks.push({ type: 'user', label: 'FastSocket Buff', size: '48B', addr, owner: 'fast_c.init' });
+                else heapBlocks.push({ type: 'free', label: 'Uncommitted Slot', size: '16B', addr, owner: 'heap.free' });
+            }
+        }
+
+        function renderHeapGrid() {
+            if (heapBlocks.length === 0) initHeapBlocks();
+            const container = document.getElementById('heap-grid-container');
+            const badge = document.getElementById('tracer-status-badge');
+            container.innerHTML = '';
+
+            if (isSimulatingLeak) {
+                badge.className = "text-[10px] bg-red-500/20 text-red-400 border border-red-500/40 px-2 py-0.5 rounded font-mono animate-pulse";
+                badge.innerHTML = "⚠ GPA Memory Leak";
+            } else {
+                badge.className = "text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono";
+                badge.innerHTML = "✔ No Leaks";
+            }
+
+            heapBlocks.forEach((b, idx) => {
+                const cell = document.createElement('div');
+                let colorClass = '';
+                switch (b.type) {
+                    case 'metadata': colorClass = 'bg-[#f7a41d] border-[#f7a41d]'; break;
+                    case 'user': colorClass = 'bg-[#4ea8de] border-[#4ea8de]'; break;
+                    case 'canary': colorClass = isCanaryCorrupted ? 'bg-red-500 border-red-400 animate-pulse' : 'bg-pink-500 border-pink-400'; break;
+                    case 'leak': colorClass = 'bg-red-500 border-red-400 animate-pulse'; break;
+                    case 'free': default: colorClass = 'bg-[#151821] border-[#242936]'; break;
+                }
+                cell.className = `h-6 rounded transition-all transform hover:scale-110 cursor-pointer border ${colorClass}`;
+                cell.title = `[0x${b.addr}] ${b.label} (${b.size})\nOwner: ${b.owner}`;
+                container.appendChild(cell);
+            });
+
+            document.getElementById('heap-legend-container').innerHTML = `
+                <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded bg-[#f7a41d]"></span><span>Meta</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded bg-[#4ea8de]"></span><span>User</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded ${isCanaryCorrupted ? 'bg-red-500' : 'bg-pink-500'}"></span><span>Canary</span></div>
+                <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded bg-[#151821] border border-[#242936]"></span><span>Free</span></div>
+            `;
+        }
+
+        function drawProfilerTimeline() {
+            const canvas = document.getElementById('profiler-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            ctx.strokeStyle = isCanaryCorrupted ? '#ef4444' : '#4ea8de';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            const step = w / (profilerHistory.length - 1);
+            profilerHistory.forEach((val, idx) => {
+                const x = idx * step;
+                const y = h - (val / 200) * (h - 10) - 5;
+                if (idx === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+
+        // Real Monaco Diagnostic Markers Trigger
+        function simulateLeak() {
+            isSimulatingLeak = true;
+            for (let i = 2; i <= 5; i++) {
+                heapBlocks[i].type = 'leak';
+            }
+            renderHeapGrid();
+
+            if (monacoModels['src/main.zig']) {
+                monaco.editor.setModelMarkers(monacoModels['src/main.zig'], 'zls', [
+                    {
+                        severity: monaco.MarkerSeverity.Error,
+                        message: 'GeneralPurposeAllocator: un-freed heap allocation detected on deinit() (64 bytes)',
+                        startLineNumber: 20,
+                        startColumn: 5,
+                        endLineNumber: 20,
+                        endColumn: 67
+                    }
+                ]);
+            }
+
+            selectFile('src/main.zig');
+            switchTerminalTab('console');
+            document.getElementById('panel-console').innerHTML += `
+                <div class="mt-2 p-2 bg-red-950/40 border border-red-500/40 rounded text-red-300 font-mono text-xs">
+                    ⚠ Memory leak staged. Monaco has applied red diagnostic squigglies to line 20. Run 'zig build run' to execute.
+                </div>
+            `;
+            document.getElementById('terminal-viewport').scrollTop = document.getElementById('terminal-viewport').scrollHeight;
+        }
+
+        function simulateCanaryOverrun() {
+            isCanaryCorrupted = true;
+            profilerHistory.push(195);
+            if (profilerHistory.length > 20) profilerHistory.shift();
+            renderHeapGrid();
+            drawProfilerTimeline();
+            document.getElementById('memory-canary-badge').className = "text-red-400 animate-pulse font-bold";
+            document.getElementById('memory-canary-badge').innerText = "🚨 Canary Corrupted!";
+
+            if (monacoModels['src/tracker.zig']) {
+                monaco.editor.setModelMarkers(monacoModels['src/tracker.zig'], 'zls', [
+                    {
+                        severity: monaco.MarkerSeverity.Error,
+                        message: 'IndexOutOfBounds: Buffer write at index [16] corrupted magic canary byte 0xAA',
+                        startLineNumber: 28,
+                        startColumn: 5,
+                        endLineNumber: 28,
+                        endColumn: 45
+                    }
+                ]);
+            }
+
+            selectFile('src/tracker.zig');
+            switchTerminalTab('console');
+            document.getElementById('panel-console').innerHTML += `
+                <div class="mt-2 p-2.5 bg-red-950/50 border border-red-500/60 rounded-lg text-red-200 font-mono text-xs">
+                    <div class="font-bold text-red-400">🚨 GENERAL PURPOSE ALLOCATOR PANIC: BUFFER OVERRUN DETECTED!</div>
+                    <div class="text-[11px] text-slate-300 mt-1 pl-2 border-l border-red-500">
+                        canary value corrupted at 0x7FFF0070<br/>
+                        expected: 0xAAAAAAAAAAAAAAAA<br/>
+                        found:&nbsp;&nbsp;&nbsp;&nbsp;0xDEADBEEFCAFEBABE (out-of-bounds byte overwrite)<br/>
+                        location: src/tracker.zig:28:5 in initMatrix<br/>
+                        [Monaco diagnostic markers placed on line 28]
+                    </div>
+                </div>
+            `;
+            document.getElementById('terminal-viewport').scrollTop = document.getElementById('terminal-viewport').scrollHeight;
+        }
+
+        function resetHeap() {
+            isSimulatingLeak = false;
+            isCanaryCorrupted = false;
+            document.getElementById('memory-canary-badge').className = "text-emerald-400";
+            document.getElementById('memory-canary-badge').innerText = "✔ Canaries Intact";
+            initHeapBlocks();
+            renderHeapGrid();
+            drawProfilerTimeline();
+
+            Object.keys(monacoModels).forEach(k => {
+                monaco.editor.setModelMarkers(monacoModels[k], 'zls', []);
+            });
+        }
+
+        function allocateChunk() {
+            const freeIndex = heapBlocks.findIndex(b => b.type === 'free');
+            if (freeIndex !== -1) {
+                heapBlocks[freeIndex].type = 'user';
+                profilerHistory.push(Math.min(180, profilerHistory[profilerHistory.length - 1] + 16));
+                if (profilerHistory.length > 20) profilerHistory.shift();
+                renderHeapGrid();
+                drawProfilerTimeline();
+            }
+        }
+
+        function freeChunk() {
+            for (let i = heapBlocks.length - 1; i >= 0; i--) {
+                if (heapBlocks[i].type === 'user') {
+                    heapBlocks[i].type = 'free';
+                    profilerHistory.push(Math.max(16, profilerHistory[profilerHistory.length - 1] - 16));
+                    if (profilerHistory.length > 20) profilerHistory.shift();
+                    renderHeapGrid();
+                    drawProfilerTimeline();
+                    break;
+                }
+            }
+        }
+
+        function onAllocatorSelectChange() {
+            activeAllocator = document.getElementById('allocator-type-select').value;
+            resetHeap();
+        }
+
+        // Comptime Reflection Cards & AST Viewer
+        function renderMonomorphizationCards() {
+            const container = document.getElementById('monomorph-deck-container');
+            const cards = [
+                { sig: "Matrix(4, 4, f32)", size: "64 bytes", align: "16B (AVX2)", status: "Inlined", tag: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+                { sig: "SockAddrIn (C ABI)", size: "16 bytes", align: "4B (System V)", status: "Zero-Cost", tag: "text-[#f7a41d] bg-[#f7a41d]/10 border-[#f7a41d]/20" },
+                { sig: "validateShape(4, 4)", size: "0 bytes", align: "Immediate", status: "Stripped", tag: "text-purple-400 bg-purple-500/10 border-purple-500/20" }
+            ];
+
+            container.innerHTML = '';
+            cards.forEach(c => {
+                const card = document.createElement('div');
+                card.className = "bg-[#090b0f] border border-[#242936] rounded-lg p-2 font-mono";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold text-white">${c.sig}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded border ${c.tag}">${c.status}</span>
+                    </div>
+                    <div class="text-[10px] text-slate-400">Size: <span class="text-slate-200">${c.size}</span> | Align: <span class="text-slate-200">${c.align}</span></div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderASTTree() {
+            const container = document.getElementById('ast-tree-container');
+            const file = projectFiles[activeFileKey];
+            container.innerHTML = '';
+            if (!file || !file.ast) return;
+
+            const buildNode = (node, depth = 0) => {
+                const div = document.createElement('div');
+                div.style.paddingLeft = `${depth * 10}px`;
+                div.className = "py-0.5 font-mono text-[11px] text-slate-300 hover:bg-[#161a24] rounded px-1 cursor-pointer";
+                div.innerHTML = `<span class="text-[#f7a41d]">⚡</span> <span class="text-slate-200">${node.label}</span>`;
+                container.appendChild(div);
+                if (node.children) node.children.forEach(c => buildNode(c, depth + 1));
+            };
+
+            file.ast.forEach(root => buildNode(root, 0));
+        }
+
+        // Terminal Pipeline Runner
+        function initTerminalLogs() {
+            const p = document.getElementById('panel-console');
+            p.innerHTML = `
+                <div class="text-slate-500">[Zig Studio v0.2] ZLS Language Server connected.</div>
+                <div class="text-slate-500">Cross-Toolchain: <span class="text-amber-400 font-semibold">${activeTargetTriple}</span></div>
+                <div class="text-slate-400 mt-1"><span class="text-[#f7a41d] font-bold">$</span> Ready. Execute <span class="text-white font-semibold">'zig build run'</span> or <span class="text-white font-semibold">'zig test'</span>.</div>
+            `;
+        }
+
+        function switchTerminalTab(tab) {
+            terminalActiveTab = tab;
+            ['console', 'tests', 'asm'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                const panel = document.getElementById(`panel-${t}`);
+                if (btn) btn.className = t === tab ? "text-white border-b-2 border-[#f7a41d] pb-0.5 font-semibold" : "text-slate-400 hover:text-slate-200 pb-0.5";
+                if (panel) {
+                    if (t === tab) panel.classList.remove('hidden');
+                    else panel.classList.add('hidden');
+                }
+            });
+        }
+
+        function clearTerminalView() {
+            document.getElementById('panel-console').innerHTML = `<div class="text-slate-500">[Console cleared] Ready.</div>`;
+            document.getElementById('panel-tests').innerHTML = `<div class="text-slate-500">Test history flushed.</div>`;
+        }
+
+        async function executeZigBuild() {
+            if (isRunningPipeline) return;
+            isRunningPipeline = true;
+            switchTerminalTab('console');
+
+            const panel = document.getElementById('panel-console');
+            const runBtn = document.getElementById('btn-build-run');
+            runBtn.classList.add('opacity-50', 'pointer-events-none');
+
+            const optFlag = activeBuildMode === 'Debug' ? '' : ` -Doptimize=${activeBuildMode}`;
+            const targetFlag = ` -Dtarget=${activeTargetTriple}`;
+            const cmd = `zig build run${targetFlag}${optFlag} --summary all`;
+
+            panel.innerHTML += `<div class="mt-2 pt-2 border-t border-[#242936] text-slate-300 font-bold"><span class="text-[#f7a41d]">$</span> ${cmd}</div>`;
+            scrollToBottom();
+
+            await sleep(200);
+            panel.innerHTML += `<div class="text-slate-400 pl-3">↳ [1/4] <span class="text-cyan-400">Semantic Analysis</span>: Inlined 4 @comptime generic paths for ${activeTargetTriple}</div>`;
+            scrollToBottom();
+
+            await sleep(200);
+            panel.innerHTML += `<div class="text-slate-400 pl-3">↳ [2/4] <span class="text-amber-400">C ABI Validation</span>: SockAddrIn verified against target ABI</div>`;
+            scrollToBottom();
+
+            await sleep(250);
+            panel.innerHTML += `<div class="text-slate-400 pl-3">↳ [3/4] <span class="text-emerald-400">Code Emission</span>: Emitted native binary <span class="text-white font-mono">zig_studio_app</span></div>`;
+            scrollToBottom();
+
+            await sleep(250);
+            panel.innerHTML += `<div class="text-green-400 font-bold mt-2">✔ Build succeeded in 0.048s. Output:</div>`;
+
+            if (isSimulatingLeak) {
+                panel.innerHTML += `
+                    <div class="bg-red-950/40 border border-red-500/50 p-3 rounded-lg font-mono text-red-200 mt-2 text-xs">
+                        <div class="text-red-400 font-bold">❌ GeneralPurposeAllocator Leak Detected!</div>
+                        <div class="text-slate-300 mt-1 pl-2 border-l border-red-500/40 text-[11px]">
+                            [gpa] error: memory leak: 0x7FFF0030..0x7FFF0070 (64 bytes)<br/>
+                            allocated at: src/tracker.zig:28:34 in initMatrix<br/>
+                            called from: src/main.zig:20:19 in main
+                        </div>
+                    </div>
+                `;
+            } else if (activeTargetTriple === 'wasm32-freestanding') {
+                panel.innerHTML += `
+                    <div class="bg-black/50 border border-[#242936] p-2.5 rounded-lg font-mono text-slate-200 mt-1.5 text-xs">
+                        <div class="text-cyan-300">== Zig Studio v0.2 WebAssembly Module Initialized ==</div>
+                        <div>Target: wasm32-freestanding | Mode: ${activeBuildMode}</div>
+                        <div>Linear Memory: 64 KB initial page allocated (0 OS syscall overhead).</div>
+                        <div class="text-emerald-400">WASM byte code verified and ready for browser execution.</div>
+                    </div>
+                `;
+            } else {
+                panel.innerHTML += `
+                    <div class="bg-black/50 border border-[#242936] p-2.5 rounded-lg font-mono text-slate-200 mt-1.5 text-xs">
+                        <div class="text-cyan-300">== Zig Studio v0.2 Runtime Initialized ==</div>
+                        <div>Target: ${activeTargetTriple} | Mode: ${activeBuildMode}</div>
+                        <div>Bound non-blocking socket (fd=3) via zero-cost C ABI.</div>
+                        <div class="text-emerald-400">Pipeline executed with zero leaks and optimal memory layout.</div>
+                    </div>
+                `;
+            }
+
+            scrollToBottom();
+            runBtn.classList.remove('opacity-50', 'pointer-events-none');
+            isRunningPipeline = false;
+        }
+
+        async function executeZigTest() {
+            switchTerminalTab('tests');
+            const panel = document.getElementById('panel-tests');
+            panel.innerHTML = `<div class="text-yellow-400 font-medium animate-pulse">Running test runner: zig test src/main.zig...</div>`;
+
+            await sleep(250);
+            panel.innerHTML = `
+                <div class="flex items-center justify-between pb-2 border-b border-[#242936] mb-2 font-mono text-xs">
+                    <span class="text-green-400 font-bold">All 4 test suites passed</span>
+                    <span class="text-slate-400">Target: ${activeTargetTriple}</span>
+                </div>
+                <div class="space-y-1.5 font-mono text-xs">
+                    <div class="bg-[#12151c] p-2 rounded border border-[#242936] flex justify-between">
+                        <span>✓ [src/main.zig] "comptime matrix shape validator"</span>
+                        <span class="text-green-400">0.02ms</span>
+                    </div>
+                    <div class="bg-[#12151c] p-2 rounded border border-[#242936] flex justify-between">
+                        <span>✓ [src/main.zig] "comptime generic matrix alignment"</span>
+                        <span class="text-green-400">0.01ms</span>
+                    </div>
+                    <div class="bg-[#12151c] p-2 rounded border border-[#242936] flex justify-between">
+                        <span>✓ [src/fast_c.zig] "struct alignment and size invariants"</span>
+                        <span class="text-green-400">0.01ms</span>
+                    </div>
+                    <div class="bg-[#12151c] p-2 rounded border border-[#242936] flex justify-between">
+                        <span>✓ [src/tracker.zig] "identity matrix generation"</span>
+                        <span class="text-green-400">0.03ms</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // REAL DUAL-MODE ZLS PROTOCOL BRIDGE IMPLEMENTATION
+        function toggleZlsModal() {
+            const modal = document.getElementById('zls-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function switchZlsMode(mode) {
+            activeZlsMode = mode;
+            const mockBtn = document.getElementById('zls-mode-mock-btn');
+            const wsBtn = document.getElementById('zls-mode-ws-btn');
+            const statusDesc = document.getElementById('zls-active-state-desc');
+
+            if (mode === 'mock') {
+                mockBtn.className = "p-3 bg-[#f7a41d]/15 border-2 border-[#f7a41d] rounded-lg text-left transition";
+                wsBtn.className = "p-3 bg-[#161a24] border-2 border-[#242936] rounded-lg text-left hover:border-slate-500 transition";
+                statusDesc.innerText = "Mode: In-Browser Mock Simulator Active";
+
+                if (zlsWebSocket) {
+                    zlsWebSocket.close();
+                    zlsWebSocket = null;
+                }
+
+                setZlsUIStatus('In-Browser Mock', 'cyan', 'ZLS In-Browser Engine Ready');
+                logZlsMessage("INFO", "Switched to In-Browser Comptime ZLS engine.");
+            } else {
+                wsBtn.className = "p-3 bg-[#f7a41d]/15 border-2 border-[#f7a41d] rounded-lg text-left transition";
+                mockBtn.className = "p-3 bg-[#161a24] border-2 border-[#242936] rounded-lg text-left hover:border-slate-500 transition";
+                statusDesc.innerText = "Mode: Native WebSocket Daemon Active";
+
+                reconnectWebSocket();
+            }
+        }
+
+        function reconnectWebSocket() {
+            const urlInput = document.getElementById('zls-ws-url-input');
+            const wsUrl = urlInput.value.trim() || 'ws://localhost:9999';
+
+            logZlsMessage("INFO", `Attempting WebSocket connection to ${wsUrl}...`);
+            setZlsUIStatus('Connecting...', 'amber', `Connecting to ${wsUrl}...`);
+
+            if (zlsWebSocket) {
+                zlsWebSocket.close();
+                zlsWebSocket = null;
+            }
+
+            try {
+                zlsWebSocket = new WebSocket(wsUrl);
+
+                zlsWebSocket.onopen = function() {
+                    setZlsUIStatus('ZLS Daemon Connected', 'emerald', `ZLS Native Daemon (${wsUrl}) Connected`);
+                    logZlsMessage("EVENT", `WebSocket connected to ${wsUrl} successfully!`);
+
+                    const initReq = {
+                        jsonrpc: "2.0",
+                        id: 1,
+                        method: "initialize",
+                        params: {
+                            processId: null,
+                            rootUri: "file:///workspace/zig_studio_app",
+                            capabilities: { textDocument: { hover: { contentFormat: ["markdown"] } } }
+                        }
+                    };
+                    zlsWebSocket.send(JSON.stringify(initReq));
+                    logZlsMessage("OUT", "initialize", initReq);
+                };
+
+                zlsWebSocket.onmessage = function(event) {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        logZlsMessage("IN", msg.method || `id:${msg.id}`, msg);
+                    } catch (e) {
+                        logZlsMessage("IN", "raw", event.data);
+                    }
+                };
+
+                zlsWebSocket.onerror = function(err) {
+                    setZlsUIStatus('ZLS Offline (Retry)', 'red', `Failed to connect to ${wsUrl}`);
+                    logZlsMessage("ERR", `Connection to ${wsUrl} refused. Is zls_bridge.js running?`);
+                };
+
+                zlsWebSocket.onclose = function() {
+                    if (activeZlsMode === 'ws') {
+                        setZlsUIStatus('ZLS Disconnected', 'red', `Disconnected from ${wsUrl}`);
+                        logZlsMessage("WARN", `WebSocket connection closed.`);
+                    }
+                };
+            } catch (err) {
+                setZlsUIStatus('ZLS Error', 'red', err.message);
+                logZlsMessage("ERR", err.message);
+            }
+        }
+
+        function setZlsUIStatus(buttonText, color, footerText) {
+            const pillText = document.getElementById('zls-status-text');
+            const pillDot = document.getElementById('zls-status-dot');
+            const footerStatus = document.getElementById('footer-zls-status');
+
+            pillText.innerText = buttonText;
+
+            if (color === 'emerald') {
+                pillDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+                pillText.className = "text-emerald-300 font-mono text-[11px]";
+                footerStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300 font-medium">${footerText}</span>`;
+            } else if (color === 'amber') {
+                pillDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+                pillText.className = "text-amber-300 font-mono text-[11px]";
+                footerStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-amber-300 font-medium">${footerText}</span>`;
+            } else if (color === 'red') {
+                pillDot.className = "w-2 h-2 rounded-full bg-red-500 animate-pulse";
+                pillText.className = "text-red-300 font-mono text-[11px]";
+                footerStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span><span class="text-red-400 font-medium">${footerText}</span>`;
+            } else {
+                pillDot.className = "w-2 h-2 rounded-full bg-cyan-400 animate-pulse";
+                pillText.className = "text-slate-200 font-mono text-[11px]";
+                footerStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyan-400"></span><span class="text-slate-300 font-medium">${footerText}</span>`;
+            }
+        }
+
+        function logZlsMessage(dir, method, data) {
+            const time = new Date().toISOString().substring(11, 19);
+            zlsLogs.unshift({ time, dir, method, data });
+            if (zlsLogs.length > 40) zlsLogs.pop();
+            renderZlsLogs();
+        }
+
+        function clearZlsLogs() {
+            zlsLogs = [];
+            renderZlsLogs();
+        }
+
+        function renderZlsLogs() {
+            const logContainer = document.getElementById('zls-traffic-log');
+            if (!logContainer) return;
+            logContainer.innerHTML = '';
+
+            zlsLogs.forEach(l => {
+                const item = document.createElement('div');
+                let dirColor = 'text-cyan-400';
+                if (l.dir === 'OUT') dirColor = 'text-amber-400';
+                else if (l.dir === 'ERR') dirColor = 'text-red-400 font-bold';
+                else if (l.dir === 'EVENT') dirColor = 'text-emerald-400 font-bold';
+
+                const payloadStr = l.data ? (typeof l.data === 'object' ? JSON.stringify(l.data) : String(l.data)) : '';
+                item.className = "truncate hover:text-white transition";
+                item.innerHTML = `
+                    <span class="text-slate-500">${l.time}</span>
+                    <span class="${dirColor} font-bold mx-1">[${l.dir}]</span>
+                    <span class="text-slate-200 font-semibold">${l.method}</span>
+                    <span class="text-slate-500 text-[10px] ml-1">${escapeHtml(payloadStr.substring(0, 70))}</span>
+                `;
+                logContainer.appendChild(item);
+            });
+        }
+
+        function scrollToBottom() {
+            const vp = document.getElementById('terminal-viewport');
+            if (vp) vp.scrollTop = vp.scrollHeight;
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+        function escapeHtml(s) { const d = document.createElement('div'); d.innerText = s; return d.innerHTML; }
+    </script>
+</body>
+</html>
