@@ -181,6 +181,9 @@
                 <button onclick="toggleZenMode()" id="toggle-btn-zen-hdr" title="Distraction-Free Zen Mode (Alt+Z)" class="px-2 py-1 text-emerald-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
                     🧘 Zen
                 </button>
+                <button onclick="openDevOpsModal()" id="toggle-btn-devops-hdr" title="DevOps Setup Wizard (Zero-Terminal)" class="px-2 py-1 text-purple-400 hover:text-white rounded hover:bg-[#1a1f2c] transition text-xs font-mono">
+                    ⚙️ Setup
+                </button>
             </div>
         </div>
 
@@ -2613,6 +2616,7 @@ main:
         // v0.3 FUZZY QUICK OPEN & COMMAND PALETTE ENGINE
         // ====================================================================
         const paletteCommands = [
+            { type: 'cmd', label: 'DevOps: Open Setup Wizard', shortcut: '', action: () => openDevOpsModal() },
             { type: 'cmd', label: 'View: Toggle Split Editor Panes', shortcut: 'Ctrl+\\', action: () => toggleSplitEditor() },
             { type: 'cmd', label: 'View: Toggle Distraction-Free Zen Mode', shortcut: 'Alt+Z', action: () => toggleZenMode() },
             { type: 'cmd', label: 'View: Raw Hex Memory Dump', shortcut: 'Alt+H', action: () => setHeapViewMode('hex') },
@@ -2816,11 +2820,57 @@ main:
         }
 
         // ====================================================================
+        // v0.3 DEVOPS SETUP WIZARD (ZERO-TERMINAL CONFIGURATION)
+        // ====================================================================
+        function openDevOpsModal() {
+            const modal = document.getElementById('devops-setup-modal');
+            if (modal) {
+                const saved = localStorage.getItem('zig_studio_devops_config');
+                if (saved) {
+                    try {
+                        const cfg = JSON.parse(saved);
+                        if (cfg.port && document.getElementById('modal-cfg-port')) document.getElementById('modal-cfg-port').value = cfg.port;
+                        if (cfg.host && document.getElementById('modal-cfg-host')) document.getElementById('modal-cfg-host').value = cfg.host;
+                        if (cfg.zigPath && document.getElementById('modal-cfg-zig')) document.getElementById('modal-cfg-zig').value = cfg.zigPath;
+                        if (cfg.zlsPath && document.getElementById('modal-cfg-zls')) document.getElementById('modal-cfg-zls').value = cfg.zlsPath;
+                        if (cfg.sandboxMode && document.getElementById('modal-cfg-sandbox')) document.getElementById('modal-cfg-sandbox').value = cfg.sandboxMode;
+                    } catch (e) {}
+                }
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeDevOpsModal() {
+            const modal = document.getElementById('devops-setup-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function saveDevOpsSettings() {
+            const config = {
+                port: parseInt(document.getElementById('modal-cfg-port').value.trim(), 10) || 9999,
+                host: document.getElementById('modal-cfg-host').value,
+                zigPath: document.getElementById('modal-cfg-zig').value.trim() || 'zig',
+                zlsPath: document.getElementById('modal-cfg-zls').value.trim() || 'zls',
+                sandboxMode: document.getElementById('modal-cfg-sandbox').value,
+                updatedAt: new Date().toISOString()
+            };
+            localStorage.setItem('zig_studio_devops_config', JSON.stringify(config));
+            closeDevOpsModal();
+            appendTerminalOutput(`\x1b[32m[DEVOPS]\x1b[0m Configuration updated: Bridge :${config.port} (${config.host}), Sandbox: ${config.sandboxMode}`);
+        }
+
+        // ====================================================================
         // v0.3 GLOBAL KEYBOARD SHORTCUT DISPATCHER
         // ====================================================================
         window.addEventListener('keydown', (e) => {
-            // Escape closes palette or exits Zen mode
+            // Escape closes palette, devops modal, or exits Zen mode
             if (e.key === 'Escape') {
+                const devops = document.getElementById('devops-setup-modal');
+                if (devops && !devops.classList.contains('hidden')) {
+                    e.preventDefault();
+                    closeDevOpsModal();
+                    return;
+                }
                 const pal = document.getElementById('command-palette-modal');
                 if (pal && !pal.classList.contains('hidden')) {
                     e.preventDefault();
@@ -2932,6 +2982,70 @@ main:
             <div class="bg-[#0c0e14] px-3 py-1.5 border-t border-[#242936] flex items-center justify-between text-[10px] text-slate-500 font-mono">
                 <span>↑↓ navigate · ↵ select · ESC close</span>
                 <span id="palette-mode-hint">Files Mode (Ctrl+P) · Type > for commands</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEVOPS SETUP WIZARD MODAL -->
+    <div id="devops-setup-modal" class="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden" onclick="if(event.target === this) closeDevOpsModal()">
+        <div class="bg-[#12151c] border border-[#2d3446] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-150 flex flex-col" onclick="event.stopPropagation()">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-[#242936] flex items-center justify-between bg-[#0c0e14]">
+                <div class="flex items-center space-x-2.5">
+                    <span class="text-base text-[#f7a41d]">⚡</span>
+                    <div>
+                        <h3 class="text-sm font-bold text-white tracking-wide">DevOps Environment & Setup Wizard</h3>
+                        <p class="text-[11px] text-slate-400">Zero-terminal configuration for toolchains, ports, and sandboxing</p>
+                    </div>
+                </div>
+                <button onclick="closeDevOpsModal()" class="text-slate-400 hover:text-white text-sm px-2 py-1 rounded hover:bg-[#1e2433] transition">✕</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 space-y-4 text-xs font-mono">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-300 font-sans font-semibold mb-1">WebSocket Bridge Port</label>
+                        <input type="number" id="modal-cfg-port" value="9999" class="w-full bg-[#090b0f] border border-[#242936] rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-[#f7a41d]" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-300 font-sans font-semibold mb-1">Network Host Binding</label>
+                        <select id="modal-cfg-host" class="w-full bg-[#090b0f] border border-[#242936] rounded px-2 py-1.5 text-slate-100 focus:outline-none focus:border-[#f7a41d]">
+                            <option value="127.0.0.1">127.0.0.1 (Local)</option>
+                            <option value="0.0.0.0">0.0.0.0 (Docker/Remote)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-sans font-semibold mb-1">Zig Compiler Executable</label>
+                    <input type="text" id="modal-cfg-zig" value="zig" placeholder="zig or absolute path" class="w-full bg-[#090b0f] border border-[#242936] rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-[#f7a41d]" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-sans font-semibold mb-1">ZLS Language Server Executable</label>
+                    <input type="text" id="modal-cfg-zls" value="zls" placeholder="zls or absolute path" class="w-full bg-[#090b0f] border border-[#242936] rounded px-2.5 py-1.5 text-slate-100 focus:outline-none focus:border-[#f7a41d]" />
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 font-sans font-semibold mb-1">Execution Sandboxing Profile</label>
+                    <select id="modal-cfg-sandbox" class="w-full bg-[#090b0f] border border-[#242936] rounded px-2 py-1.5 text-slate-100 focus:outline-none focus:border-[#f7a41d]">
+                        <option value="native">Local Native (Direct execution on host)</option>
+                        <option value="container">Container Micro-VM (Docker / Podman cgroups)</option>
+                        <option value="comptime">Browser Comptime (Offline simulation)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-[#0c0e14] px-5 py-3 border-t border-[#242936] flex items-center justify-between">
+                <a href="setup.html" target="_blank" class="text-xs text-[#4ea8de] hover:underline flex items-center space-x-1 font-sans">
+                    <span>Open Full Setup App ↗</span>
+                </a>
+                <div class="flex items-center space-x-2 font-sans">
+                    <button onclick="closeDevOpsModal()" class="px-3 py-1.5 rounded text-xs text-slate-400 hover:text-white hover:bg-[#1a1f2c] transition">Cancel</button>
+                    <button onclick="saveDevOpsSettings()" class="px-4 py-1.5 rounded bg-[#f7a41d] hover:bg-[#e09112] text-slate-950 font-bold text-xs transition shadow-md shadow-amber-500/20">Save & Apply</button>
+                </div>
             </div>
         </div>
     </div>

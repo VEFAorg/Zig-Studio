@@ -1,12 +1,14 @@
 {
   "name": "zig-studio",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The Bespoke Web & Desktop IDE for the Zig Programming Language & Toolchain",
   "main": "index.html",
   "scripts": {
     "start": "node zls_bridge.js",
     "serve": "npx serve .",
-    "test": "node zls_bridge.js --test"
+    "test": "node zls_bridge.js --test",
+    "build": "node scripts/build-release.js",
+    "compile": "node scripts/build-release.js"
   },
   "repository": {
     "type": "git",

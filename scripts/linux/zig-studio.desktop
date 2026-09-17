@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Zig Studio
+Comment=The Bespoke Web & Desktop IDE for Zig
+Exec=sh -c '"$(dirname "$1")/zig-studio"' dummy %k
+Icon=utilities-terminal
+Terminal=false
+Type=Application
+Categories=Development;IDE;TextEditor;
+StartupNotify=true
+MimeType=text/x-zig;
+Keywords=zig;zls;ide;compiler;systems;

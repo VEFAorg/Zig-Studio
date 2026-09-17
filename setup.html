@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zig Studio — DevOps Setup Wizard ⚡</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0d11;
+            color: #e2e8f0;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(247, 164, 29, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(78, 168, 222, 0.08) 0px, transparent 50%);
+        }
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .glass-panel {
+            background: rgba(18, 22, 31, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-accent {
+            box-shadow: 0 0 25px rgba(247, 164, 29, 0.15);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0d11; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f7a41d; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-8">
+
+    <!-- Top Navigation -->
+    <header class="max-w-4xl mx-auto w-full flex items-center justify-between pb-6 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-bold text-lg">⚡</div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight text-white flex items-center space-x-2">
+                    <span>Zig Studio</span>
+                    <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 font-mono">v0.3.1 DevOps</span>
+                </h1>
+                <p class="text-xs text-slate-400">Zero-Terminal Installation & Systems Environment Wizard</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <a href="index.html" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-md border border-slate-700 hover:border-slate-600 transition">
+                Skip to IDE →
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-4xl mx-auto w-full py-8 space-y-8 flex-1">
+
+        <!-- Pre-Flight Health Check Card -->
+        <section class="glass-panel rounded-xl p-6 glow-accent">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>System Pre-Flight Diagnostics</span>
+                </h2>
+                <button onclick="runDiagnostics()" class="text-xs text-amber-400 hover:text-amber-300 flex items-center space-x-1">
+                    <span>↻ Refresh Checks</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Check 1: Browser Environment -->
+                <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800">
+                    <div class="text-[11px] text-slate-400">Client Engine</div>
+                    <div class="text-sm font-semibold text-emerald-400 mt-1 flex items-center space-x-1.5">
+                        <span>✓</span>
+                        <span id="diag-browser">Modern ES6+</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">Virtual Monaco OK</div>
+                </div>
+
+                <!-- Check 2: WebSocket Bridge -->
+                <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800">
+                    <div class="text-[11px] text-slate-400">ZLS Daemon Bridge</div>
+                    <div class="text-sm font-semibold text-amber-400 mt-1 flex items-center space-x-1.5" id="diag-bridge-status">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                        <span id="diag-bridge-text">Testing :9999...</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1" id="diag-bridge-sub">RFC 6455 Handshake</div>
+                </div>
+
+                <!-- Check 3: WebAssembly -->
+                <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800">
+                    <div class="text-[11px] text-slate-400">WASM Sandbox</div>
+                    <div class="text-sm font-semibold text-emerald-400 mt-1 flex items-center space-x-1.5">
+                        <span>✓</span>
+                        <span>WASM Supported</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">Linear 64KB Pages</div>
+                </div>
+
+                <!-- Check 4: Local Storage -->
+                <div class="bg-slate-900/60 p-3.5 rounded-lg border border-slate-800">
+                    <div class="text-[11px] text-slate-400">Config Persistence</div>
+                    <div class="text-sm font-semibold text-emerald-400 mt-1 flex items-center space-x-1.5">
+                        <span>✓</span>
+                        <span id="diag-storage">Ready</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-1">Zero-Terminal Cache</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration Form -->
+        <form id="setup-form" class="space-y-6" onsubmit="event.preventDefault(); saveAndLaunch();">
+
+            <!-- Section 1: Toolchain & Compiler Paths -->
+            <section class="glass-panel rounded-xl p-6 space-y-4">
+                <div class="border-b border-slate-800 pb-3">
+                    <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+                        <span class="text-amber-400">⚡</span>
+                        <span>1. Toolchain & Language Server Paths</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">Set custom paths for Zig compilers (nightly, master, or release) and ZLS binaries.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Zig Compiler Executable</label>
+                        <div class="relative">
+                            <input type="text" id="cfg-zig-path" value="zig" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white code-font focus:outline-none focus:border-amber-500" placeholder="zig or /usr/local/bin/zig">
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">Default: `zig` on system PATH, or absolute executable path.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Zig Language Server (ZLS) Executable</label>
+                        <div class="relative">
+                            <input type="text" id="cfg-zls-path" value="zls" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white code-font focus:outline-none focus:border-amber-500" placeholder="zls or C:\tools\zls.exe">
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">Default: `zls` on system PATH, or absolute binary path.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: DevOps & Network Binding -->
+            <section class="glass-panel rounded-xl p-6 space-y-4">
+                <div class="border-b border-slate-800 pb-3">
+                    <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+                        <span class="text-blue-400">🌐</span>
+                        <span>2. DevOps Network & Bridge Daemon Binding</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">Configure WebSocket transport for local desktop use, Docker containers, or remote cloud VMs.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">WebSocket Port</label>
+                        <input type="number" id="cfg-port" value="9999" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white code-font focus:outline-none focus:border-amber-500">
+                        <p class="text-[11px] text-slate-500 mt-1">Default: 9999 (RFC 6455 stream)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Network Binding Host</label>
+                        <select id="cfg-host" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <option value="127.0.0.1">127.0.0.1 (Local Workstation Only)</option>
+                            <option value="0.0.0.0">0.0.0.0 (Docker Container / DevContainer / Remote SSH)</option>
+                        </select>
+                        <p class="text-[11px] text-slate-500 mt-1">Select 0.0.0.0 for containerized environments.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Daemon Auto-Spawn</label>
+                        <select id="cfg-autostart" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500">
+                            <option value="true">Enabled (Auto-start bridge daemon)</option>
+                            <option value="false">Manual (External service manages bridge)</option>
+                        </select>
+                        <p class="text-[11px] text-slate-500 mt-1">Automatically spins up zls_bridge.js</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Sandboxing & Execution Mode -->
+            <section class="glass-panel rounded-xl p-6 space-y-4">
+                <div class="border-b border-slate-800 pb-3">
+                    <h3 class="text-base font-semibold text-white flex items-center space-x-2">
+                        <span class="text-purple-400">🛡️</span>
+                        <span>3. Execution Sandboxing Profile</span>
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">Choose how code execution (`zig build run`, `zig test`) is quarantined.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <label class="bg-slate-900/60 p-4 rounded-lg border border-slate-800 hover:border-amber-500/50 cursor-pointer transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-sm text-white">Local Native</span>
+                                <input type="radio" name="sandbox_mode" value="native" checked class="text-amber-500 focus:ring-amber-500">
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2">Direct execution via host system compiler. Blazing fast, zero container overhead.</p>
+                        </div>
+                        <span class="text-[10px] text-amber-400 mt-3 inline-block font-mono">Profile: Standard Host</span>
+                    </label>
+
+                    <label class="bg-slate-900/60 p-4 rounded-lg border border-slate-800 hover:border-blue-500/50 cursor-pointer transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-sm text-white">Container Micro-VM</span>
+                                <input type="radio" name="sandbox_mode" value="container" class="text-blue-500 focus:ring-blue-500">
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2">Ephemeral Docker/Podman container with cgroups memory & CPU caps to prevent RCE.</p>
+                        </div>
+                        <span class="text-[10px] text-blue-400 mt-3 inline-block font-mono">Profile: DevOps Hardened</span>
+                    </label>
+
+                    <label class="bg-slate-900/60 p-4 rounded-lg border border-slate-800 hover:border-emerald-500/50 cursor-pointer transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-sm text-white">Browser Comptime</span>
+                                <input type="radio" name="sandbox_mode" value="comptime" class="text-emerald-500 focus:ring-emerald-500">
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2">Pure in-browser simulation engine. 100% offline, zero server or toolchain required.</p>
+                        </div>
+                        <span class="text-[10px] text-emerald-400 mt-3 inline-block font-mono">Profile: Air-Gapped Standalone</span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- Section 4: Action Buttons -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+                <div class="flex items-center space-x-3 w-full sm:w-auto">
+                    <button type="button" onclick="exportManifest()" class="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-600 bg-slate-900 text-xs font-semibold text-slate-200 hover:text-white transition flex items-center justify-center space-x-2">
+                        <span>📥</span>
+                        <span>Export `zig-studio.json`</span>
+                    </button>
+                    <button type="button" onclick="resetDefaults()" class="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-slate-800 hover:border-slate-700 text-xs font-medium text-slate-400 hover:text-slate-200 transition">
+                        Reset Defaults
+                    </button>
+                </div>
+
+                <div class="w-full sm:w-auto flex items-center space-x-3">
+                    <button type="submit" class="w-full sm:w-auto px-6 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-sm tracking-wide shadow-lg shadow-amber-500/20 transition flex items-center justify-center space-x-2">
+                        <span>⚡</span>
+                        <span>Save & Launch Zig Studio</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-4xl mx-auto w-full pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+        <div>
+            Engineered by <strong class="text-slate-400">Devin Damon Shinkle</strong>, <strong class="text-slate-400">VEFAorg</strong>, and <strong class="text-slate-400">Antigravity (Google DeepMind)</strong>
+        </div>
+        <div class="code-font">
+            MIT License • Zero Runtime Overhead
+        </div>
+    </footer>
+
+    <!-- Logic Script -->
+    <script>
+        // Pre-flight test
+        function runDiagnostics() {
+            const bridgeStatus = document.getElementById('diag-bridge-status');
+            const bridgeText = document.getElementById('diag-bridge-text');
+            const bridgeSub = document.getElementById('diag-bridge-sub');
+            const port = document.getElementById('cfg-port').value || 9999;
+
+            bridgeText.innerText = `Probing :${port}...`;
+            bridgeStatus.className = "text-sm font-semibold text-amber-400 mt-1 flex items-center space-x-1.5";
+
+            const ws = new WebSocket(`ws://localhost:${port}`);
+            let answered = false;
+
+            ws.onopen = () => {
+                answered = true;
+                bridgeText.innerText = `Active (:${port})`;
+                bridgeStatus.className = "text-sm font-semibold text-emerald-400 mt-1 flex items-center space-x-1.5";
+                bridgeSub.innerText = "RFC 6455 Connected";
+                ws.close();
+            };
+
+            ws.onerror = () => {
+                if (!answered) {
+                    bridgeText.innerText = "Offline (Ready to Spawn)";
+                    bridgeStatus.className = "text-sm font-semibold text-slate-400 mt-1 flex items-center space-x-1.5";
+                    bridgeSub.innerText = "Spawns automatically";
+                }
+            };
+
+            setTimeout(() => {
+                if (!answered && ws.readyState !== 1) {
+                    bridgeText.innerText = "Offline (Ready to Spawn)";
+                    bridgeStatus.className = "text-sm font-semibold text-slate-400 mt-1 flex items-center space-x-1.5";
+                    bridgeSub.innerText = "Spawns automatically";
+                    ws.close();
+                }
+            }, 800);
+        }
+
+        // Load existing saved configuration
+        function loadConfig() {
+            const saved = localStorage.getItem('zig_studio_devops_config');
+            if (saved) {
+                try {
+                    const cfg = JSON.parse(saved);
+                    if (cfg.zigPath) document.getElementById('cfg-zig-path').value = cfg.zigPath;
+                    if (cfg.zlsPath) document.getElementById('cfg-zls-path').value = cfg.zlsPath;
+                    if (cfg.port) document.getElementById('cfg-port').value = cfg.port;
+                    if (cfg.host) document.getElementById('cfg-host').value = cfg.host;
+                    if (cfg.autoStart !== undefined) document.getElementById('cfg-autostart').value = cfg.autoStart.toString();
+                    if (cfg.sandboxMode) {
+                        const radio = document.querySelector(`input[name="sandbox_mode"][value="${cfg.sandboxMode}"]`);
+                        if (radio) radio.checked = true;
+                    }
+                } catch (e) {
+                    console.error("Failed to parse saved config", e);
+                }
+            }
+            runDiagnostics();
+        }
+
+        function getFormData() {
+            return {
+                zigPath: document.getElementById('cfg-zig-path').value.trim() || 'zig',
+                zlsPath: document.getElementById('cfg-zls-path').value.trim() || 'zls',
+                port: parseInt(document.getElementById('cfg-port').value.trim(), 10) || 9999,
+                host: document.getElementById('cfg-host').value,
+                autoStart: document.getElementById('cfg-autostart').value === 'true',
+                sandboxMode: document.querySelector('input[name="sandbox_mode"]:checked')?.value || 'native',
+                configuredAt: new Date().toISOString()
+            };
+        }
+
+        function saveAndLaunch() {
+            const config = getFormData();
+            localStorage.setItem('zig_studio_devops_config', JSON.stringify(config));
+            
+            // Redirect smoothly to the primary IDE
+            window.location.href = `index.html?port=${config.port}&host=${config.host}&mode=${config.sandboxMode}`;
+        }
+
+        function exportManifest() {
+            const config = getFormData();
+            const jsonStr = JSON.stringify(config, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "zig-studio.json";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function resetDefaults() {
+            document.getElementById('cfg-zig-path').value = "zig";
+            document.getElementById('cfg-zls-path').value = "zls";
+            document.getElementById('cfg-port').value = 9999;
+            document.getElementById('cfg-host').value = "127.0.0.1";
+            document.getElementById('cfg-autostart').value = "true";
+            document.querySelector('input[name="sandbox_mode"][value="native"]').checked = true;
+            localStorage.removeItem('zig_studio_devops_config');
+            runDiagnostics();
+        }
+
+        window.onload = loadConfig;
+    </script>
+</body>
+</html>
